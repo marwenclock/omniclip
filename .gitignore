@@ -1,0 +1,7 @@
+# generated test media (make them with test/make-test-audio.ps1)
+test/*.wav
+test/*.mp4
+test/*.webm
+.DS_Store
+Thumbs.db
+*.log

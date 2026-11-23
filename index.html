@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMNICLIP · free on-device shorts maker by BANKASI MEDIA</title>
+<meta name="description" content="Turn long videos into vertical shorts with captions, for free, entirely on your device. No account, no upload.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>✂ OMNICLIP <sub>by BANKASI<sup>MEDIA</sup> · early prototype</sub></h1>
+  <p class="lede">Drop a long video. It is transcribed and the best moments for shorts are picked, all on this computer. Nothing is uploaded.</p>
+</header>
+
+<main>
+  <section id="setup" class="card">
+    <div id="gpuNote" class="note"></div>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="video/*,audio/*" hidden>
+      <strong>Drop a video or audio file here</strong>
+      <span>or click to choose · MP4, MOV, WebM, MP3, WAV…</span>
+    </label>
+    <details>
+      <summary>Settings</summary>
+      <div class="grid">
+        <label>Speech model
+          <select id="asrModel">
+            <option value="onnx-community/whisper-base">Whisper Base (fast, ~200 MB)</option>
+            <option value="onnx-community/whisper-small">Whisper Small (better, ~600 MB)</option>
+            <option value="onnx-community/whisper-large-v3-turbo">Whisper Large v3 Turbo (best, ~1.6 GB)</option>
+          </select>
+        </label>
+        <label>Language
+          <select id="lang">
+            <option value="en">English</option>
+            <option value="ar">Arabic</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+          </select>
+        </label>
+        <label>Clip picker model
+          <select id="llmModel">
+            <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">AI: Qwen 2.5 1.5B (~1 GB, recommended)</option>
+            <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">AI: Phi-3.5 mini (~2.2 GB, best, needs a strong GPU)</option>
+            <option value="instant">Instant: no AI, works on any computer</option>
+          </select>
+        </label>
+        <label>Scan
+          <select id="scan">
+            <option value="smart">Smart: text signals pick, AI rates and titles (fast)</option>
+            <option value="all">Everything: AI reads the whole video (slow, best with the 3B model)</option>
+          </select>
+        </label>
+        <label>Number of shorts
+          <input type="number" id="count" value="8" min="1" max="30">
+        </label>
+      </div>
+    </details>
+  </section>
+
+  <section id="work" class="card" hidden>
+    <video id="player" controls playsinline></video>
+    <ol class="steps">
+      <li id="stDecode"><span class="name">Read audio</span><span class="info"></span><progress value="0" max="1"></progress></li>
+      <li id="stAsr"><span class="name">Transcribe</span><span class="info"></span><progress value="0" max="1"></progress></li>
+      <li id="stLlm"><span class="name">Load clip picker</span><span class="info"></span><progress value="0" max="1"></progress></li>
+      <li id="stPick"><span class="name">Find the best moments</span><span class="info"></span><progress value="0" max="1"></progress></li>
+    </ol>
+    <div class="tools">
+      <button id="srt" disabled>Download subtitles (.srt)</button>
+      <button id="json" disabled>Download clip list (.json)</button>
+    </div>
+  </section>
+
+  <section id="results" hidden>
+    <h2>Suggested shorts</h2>
+    <div class="card exportbar">
+      <div class="grid">
+        <label>Layout
+          <select id="exLayout">
+            <option value="auto">Crop, following the speaker (auto)</option>
+            <option value="crop">Crop to fill, fixed position</option>
+            <option value="blur">Fit, with blurred background</option>
+          </select>
+        </label>
+        <label>Crop position <span id="exPosVal">center</span>
+          <input type="range" id="exPos" min="0" max="100" value="50">
+        </label>
+        <label>Captions
+          <select id="exCaps">
+            <option value="pop">Bold, word by word</option>
+            <option value="classic">Classic subtitles</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>Title on screen
+          <select id="exTitle">
+            <option value="intro">First 3 seconds</option>
+            <option value="always">Whole clip</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>Size
+          <select id="exSize">
+            <option value="1080">1080 × 1920 (best)</option>
+            <option value="720">720 × 1280 (lighter)</option>
+          </select>
+        </label>
+      </div>
+      <div class="exrow">
+        <button id="exAll" class="primary">⬇ Export all</button>
+        <span class="note" id="exNote">Export runs in real time (a 30-second short takes about 30 seconds). Keep this tab open and visible.</span>
+      </div>
+    </div>
+    <div id="clips"></div>
+  </section>
+
+  <section id="transcriptBox" class="card" hidden>
+    <div class="thead">
+      <h2>Transcript <small>click a time to play from there · click text to fix a word</small></h2>
+      <button id="fromSel">✂ Make a short from selected lines</button>
+    </div>
+    <div id="transcript"></div>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
