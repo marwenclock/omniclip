@@ -2,6 +2,8 @@
 test/*.wav
 test/*.mp4
 test/*.webm
+# local Claude / editor settings
+.claude/
 .DS_Store
 Thumbs.db
 *.log
