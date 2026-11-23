@@ -7,3 +7,4 @@ test/*.webm
 .DS_Store
 Thumbs.db
 *.log
+.wrangler/

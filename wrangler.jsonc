@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets deployment for useomniclip.com.
+// No build step: the repo root is the site. Deploy with: npx wrangler deploy
+// (.assetsignore keeps repo-only files such as tests and docs off the site)
+{
+  "name": "omniclip",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash"
+  }
+}
