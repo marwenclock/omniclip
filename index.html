@@ -2,129 +2,242 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OMNICLIP · free on-device shorts maker by BANKASI MEDIA</title>
-<meta name="description" content="Turn long videos into vertical shorts with captions, for free, entirely on your device. No account, no upload.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OMNICLIP · Turn long videos into shorts, free and on your device · by BANKASI MEDIA</title>
+<meta name="description" content="Turn long videos and podcasts into vertical shorts with captions. Free, in your browser, processed on your device. No upload, no account, no watermark.">
+<meta name="theme-color" content="#0a0a0a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OMNICLIP">
+<meta property="og:title" content="OMNICLIP · Long video in, shorts out">
+<meta property="og:description" content="Free on-device shorts maker: finds the best moments, follows the speaker, burns in captions. Nothing is uploaded.">
+<meta property="og:url" content="https://useomniclip.com/">
+<meta name="twitter:card" content="summary">
+<link rel="canonical" href="https://useomniclip.com/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1>✂ OMNICLIP <sub>by BANKASI<sup>MEDIA</sup> · early prototype</sub></h1>
-  <p class="lede">Drop a long video. It is transcribed and the best moments for shorts are picked, all on this computer. Nothing is uploaded.</p>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <a class="brand" href="./" aria-label="OMNICLIP home">
+    <span class="logo-main">
+      <svg class="logo-frame" viewBox="0 0 16 26" aria-hidden="true"><rect x="1.2" y="1.2" width="13.6" height="23.6" rx="3.4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6.2 9.2v7.6l5.6-3.8z" fill="currentColor"/></svg><span class="sr-only">O</span><span>MNICLIP</span>
+    </span>
+  </a>
+  <span class="brand-sep" aria-hidden="true"></span>
+  <a class="logo-by" href="https://bankasimedia.com" target="_blank" rel="noopener" title="Visit bankasimedia.com"><span class="logo-byword">by</span><span class="logo-bankasi">BANKASI</span><sup class="logo-sup">MEDIA</sup></a>
+
+  <div class="top-file" id="topFile" hidden>
+    <span class="tf-icon" aria-hidden="true"></span>
+    <span class="tf-name" id="fileName"></span>
+    <span class="tf-meta" id="fileMeta"></span>
+  </div>
+
+  <nav class="top-right" aria-label="Site">
+    <button class="tb tb-text" id="newVideo" hidden>
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>New video</span>
+    </button>
+    <a class="tb" href="#how" id="howLink" title="How it works" aria-label="How it works">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3v.4M10 13.8v.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </a>
+    <a class="tb" href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener" title="Open source on GitHub" aria-label="Source code on GitHub">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 1.8a8.2 8.2 0 0 0-2.6 16c.4.1.6-.2.6-.4v-1.5c-2.3.5-2.8-1-2.8-1-.4-1-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.3.9 1.3.9.7 1.3 2 .9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.7-.9-3.7-4 0-.9.3-1.6.9-2.2-.1-.2-.4-1 .1-2.2 0 0 .7-.2 2.3.9a7.8 7.8 0 0 1 4.1 0c1.6-1.1 2.3-.9 2.3-.9.5 1.2.2 2 .1 2.2.5.6.9 1.3.9 2.2 0 3.2-1.9 3.8-3.7 4 .3.3.6.8.6 1.5v2.3c0 .2.2.5.6.4A8.2 8.2 0 0 0 10 1.8z"/></svg>
+    </a>
+  </nav>
 </header>
 
-<main>
-  <section id="setup" class="card">
-    <div id="gpuNote" class="note"></div>
-    <label class="drop" id="drop">
-      <input type="file" id="file" accept="video/*,audio/*" hidden>
-      <strong>Drop a video or audio file here</strong>
-      <span>or click to choose · MP4, MOV, WebM, MP3, WAV…</span>
-    </label>
-    <details>
-      <summary>Settings</summary>
-      <div class="grid">
-        <label>Speech model
-          <select id="asrModel">
-            <option value="onnx-community/whisper-base">Whisper Base (fast, ~200 MB)</option>
-            <option value="onnx-community/whisper-small">Whisper Small (better, ~600 MB)</option>
-            <option value="onnx-community/whisper-large-v3-turbo">Whisper Large v3 Turbo (best, ~1.6 GB)</option>
-          </select>
+<main id="main">
+  <!-- ============================== start view ============================== -->
+  <section class="start" id="setup">
+    <div class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Free shorts maker · runs on your device</p>
+        <h1>Long video in.<br>Shorts out.</h1>
+        <p class="lede">Drop a video or podcast. OMNICLIP transcribes it, finds the moments worth posting and exports vertical clips with captions, right in your browser. Nothing is uploaded.</p>
+
+        <label class="drop" id="drop" for="file">
+          <input type="file" id="file" accept="video/*,audio/*" hidden>
+          <span class="drop-tag">[drop]</span>
+          <span class="drop-title">Drop a video or podcast</span>
+          <span class="drop-sub">MP4, MOV, WebM, MP3, WAV · any length</span>
+          <span class="btn btn-primary drop-btn">Choose a file</span>
+          <span class="drop-foot" id="gpuNote">Checking your browser…</span>
         </label>
-        <label>Language
-          <select id="lang">
-            <option value="en">English</option>
-            <option value="ar">Arabic</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-          </select>
-        </label>
-        <label>Clip picker model
-          <select id="llmModel">
-            <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">AI: Qwen 2.5 1.5B (~1 GB, recommended)</option>
-            <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">AI: Phi-3.5 mini (~2.2 GB, best, needs a strong GPU)</option>
-            <option value="instant">Instant: no AI, works on any computer</option>
-          </select>
-        </label>
-        <label>Scan
-          <select id="scan">
-            <option value="smart">Smart: text signals pick, AI rates and titles (fast)</option>
-            <option value="all">Everything: AI reads the whole video (slow, best with the 3B model)</option>
-          </select>
-        </label>
-        <label>Number of shorts
-          <input type="number" id="count" value="8" min="1" max="30">
-        </label>
+
+        <details class="options" id="options">
+          <summary>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h8M15 6h1M4 14h1M8 14h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="13.5" cy="6" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6.5" cy="14" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Options
+            <span class="opt-summary" id="optSummary"></span>
+          </summary>
+          <div class="opt-grid">
+            <fieldset class="field">
+              <legend>Finding moments</legend>
+              <div class="seg" role="radiogroup">
+                <label><input type="radio" name="finder" value="smart" checked><span>Smart<small>AI-assisted · 1 GB once</small></span></label>
+                <label><input type="radio" name="finder" value="deep"><span>Deep<small>stronger AI · 2.2 GB · fast GPU</small></span></label>
+                <label><input type="radio" name="finder" value="instant"><span>Instant<small>no AI download</small></span></label>
+              </div>
+            </fieldset>
+            <fieldset class="field">
+              <legend>Transcription</legend>
+              <div class="seg" role="radiogroup">
+                <label><input type="radio" name="quality" value="fast" checked><span>Fast<small>200 MB once</small></span></label>
+                <label><input type="radio" name="quality" value="better"><span>Better<small>600 MB once</small></span></label>
+                <label><input type="radio" name="quality" value="best"><span>Best<small>1.6 GB · fast GPU</small></span></label>
+              </div>
+            </fieldset>
+            <label class="field">
+              <span class="legend">Spoken language</span>
+              <select id="lang">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="pt">Portuguese</option>
+                <option value="it">Italian</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="legend">How many shorts</span>
+              <select id="count">
+                <option>3</option><option>5</option><option selected>8</option><option>12</option><option>20</option>
+              </select>
+            </label>
+          </div>
+        </details>
       </div>
-    </details>
-  </section>
 
-  <section id="work" class="card" hidden>
-    <video id="player" controls playsinline></video>
-    <ol class="steps">
-      <li id="stDecode"><span class="name">Read audio</span><span class="info"></span><progress value="0" max="1"></progress></li>
-      <li id="stAsr"><span class="name">Transcribe</span><span class="info"></span><progress value="0" max="1"></progress></li>
-      <li id="stLlm"><span class="name">Load clip picker</span><span class="info"></span><progress value="0" max="1"></progress></li>
-      <li id="stPick"><span class="name">Find the best moments</span><span class="info"></span><progress value="0" max="1"></progress></li>
-    </ol>
-    <div class="tools">
-      <button id="srt" disabled>Download subtitles (.srt)</button>
-      <button id="json" disabled>Download clip list (.json)</button>
+      <!-- animated sample short -->
+      <div class="hero-visual" aria-hidden="true">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="ph-scene"><span class="ph-sun"></span><span class="ph-ridge r1"></span><span class="ph-ridge r2"></span><span class="ph-subject"></span></div>
+            <div class="ph-title">The $5,000 lesson</div>
+            <div class="ph-caption" id="demoCaption"><span>NOBODY</span> <span>TELLS</span> <span>YOU</span></div>
+            <div class="ph-bar"><span></span></div>
+          </div>
+        </div>
+        <div class="hv-chip hv-1"><b>9.2</b> hook score</div>
+        <div class="hv-chip hv-2">Follows the speaker</div>
+        <div class="hv-chip hv-3">0:42 → 1:09 · 27s</div>
+      </div>
     </div>
+
+    <section class="how" id="how" aria-labelledby="howTitle">
+      <h2 class="section-label" id="howTitle">How it works</h2>
+      <ol class="how-grid">
+        <li><span class="how-n">01</span><h3>Transcribe</h3><p>Speech becomes timed text on your graphics card. Fix any misheard word and the captions follow.</p></li>
+        <li><span class="how-n">02</span><h3>Find the moments</h3><p>Strong opening lines that make sense on their own are scored and titled. Pick your own lines too.</p></li>
+        <li><span class="how-n">03</span><h3>Export shorts</h3><p>Vertical 9:16 MP4s that follow the speaker, with word-by-word captions and an optional title card.</p></li>
+      </ol>
+      <ul class="chips">
+        <li>Nothing uploaded</li><li>No account</li><li>No watermark</li><li>Free &amp; open source</li><li>Podcasts become audiograms</li><li>Subtitles (.srt) too</li>
+      </ul>
+    </section>
   </section>
 
-  <section id="results" hidden>
-    <h2>Suggested shorts</h2>
-    <div class="card exportbar">
-      <div class="grid">
-        <label>Layout
+  <!-- ============================== workspace ============================== -->
+  <section class="work" id="work" hidden>
+    <aside class="work-side">
+      <div class="player-wrap">
+        <video id="player" controls playsinline></video>
+      </div>
+
+      <ol class="steps" aria-label="Progress">
+        <li id="stDecode"><span class="dot"></span><span class="name">Read audio</span><span class="info"></span><progress value="0" max="1"></progress></li>
+        <li id="stAsr"><span class="dot"></span><span class="name">Transcribe</span><span class="info"></span><progress value="0" max="1"></progress></li>
+        <li id="stLlm"><span class="dot"></span><span class="name">Prepare moment finder</span><span class="info"></span><progress value="0" max="1"></progress></li>
+        <li id="stPick"><span class="dot"></span><span class="name">Find the best moments</span><span class="info"></span><progress value="0" max="1"></progress></li>
+      </ol>
+
+      <div class="panel transcript-panel" id="transcriptBox" hidden>
+        <div class="panel-head">
+          <h2 class="section-label">Transcript</h2>
+          <div class="panel-actions">
+            <button class="btn btn-ghost btn-sm" id="fromSel" title="Select lines in the transcript first">Make a short from selection</button>
+            <button class="btn btn-ghost btn-sm" id="srt" disabled title="Download subtitles (.srt)">.srt</button>
+          </div>
+        </div>
+        <p class="hint">Click a time to play from there · click text to fix a word</p>
+        <div id="transcript"></div>
+      </div>
+    </aside>
+
+    <div class="work-main">
+      <div class="results-head">
+        <div>
+          <h2 class="results-title">Shorts</h2>
+          <p class="results-sub" id="resultsSub">Finding the best moments…</p>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost" id="json" disabled title="Download the clip list (.json)">Clip list</button>
+          <button class="btn btn-primary" id="exAll" disabled>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Export all
+          </button>
+        </div>
+      </div>
+
+      <div class="panel exportbar">
+        <label class="field">
+          <span class="legend">Framing</span>
           <select id="exLayout">
-            <option value="auto">Crop, following the speaker (auto)</option>
-            <option value="crop">Crop to fill, fixed position</option>
-            <option value="blur">Fit, with blurred background</option>
+            <option value="auto">Follow speaker</option>
+            <option value="crop">Fixed crop</option>
+            <option value="blur">Blurred fill</option>
           </select>
         </label>
-        <label>Crop position <span id="exPosVal">center</span>
+        <label class="field field-range">
+          <span class="legend">Crop position <em id="exPosVal">center</em></span>
           <input type="range" id="exPos" min="0" max="100" value="50">
         </label>
-        <label>Captions
+        <label class="field">
+          <span class="legend">Captions</span>
           <select id="exCaps">
-            <option value="pop">Bold, word by word</option>
-            <option value="classic">Classic subtitles</option>
+            <option value="pop">Word by word</option>
+            <option value="classic">Subtitles</option>
             <option value="none">None</option>
           </select>
         </label>
-        <label>Title on screen
+        <label class="field">
+          <span class="legend">Title card</span>
           <select id="exTitle">
             <option value="intro">First 3 seconds</option>
             <option value="always">Whole clip</option>
             <option value="none">None</option>
           </select>
         </label>
-        <label>Size
+        <label class="field">
+          <span class="legend">Quality</span>
           <select id="exSize">
-            <option value="1080">1080 × 1920 (best)</option>
-            <option value="720">720 × 1280 (lighter)</option>
+            <option value="1080">1080 × 1920</option>
+            <option value="720">720 × 1280</option>
           </select>
         </label>
       </div>
-      <div class="exrow">
-        <button id="exAll" class="primary">⬇ Export all</button>
-        <span class="note" id="exNote">Export runs in real time (a 30-second short takes about 30 seconds). Keep this tab open and visible.</span>
+      <p class="hint export-hint" id="exNote">Exports render in real time (a 30-second short takes about 30 seconds). Keep this tab open and visible.</p>
+
+      <div id="results">
+        <div class="clips" id="clips"></div>
+        <div class="empty" id="clipsEmpty">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+        </div>
       </div>
     </div>
-    <div id="clips"></div>
-  </section>
-
-  <section id="transcriptBox" class="card" hidden>
-    <div class="thead">
-      <h2>Transcript <small>click a time to play from there · click text to fix a word</small></h2>
-      <button id="fromSel">✂ Make a short from selected lines</button>
-    </div>
-    <div id="transcript"></div>
   </section>
 </main>
+
+<footer class="statusbar">
+  <span class="sb-left" id="status">Ready · drop a video anywhere</span>
+  <span class="sb-right">© 2026 <a href="https://bankasimedia.com" target="_blank" rel="noopener">BANKASI MEDIA</a> · Free &amp; <a href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener">open source</a> · No ads · Nothing uploaded</span>
+</footer>
+
+<div class="dropveil" id="dropVeil" hidden><div><span class="drop-tag">[drop]</span>Release to start</div></div>
 
 <script type="module" src="app.js"></script>
 </body>

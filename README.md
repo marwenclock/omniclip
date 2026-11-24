@@ -14,11 +14,11 @@ Sister project of [OMNIVIEWER](https://github.com/marwenclock/omniviewer3d), the
 ## What it does
 
 1. **Drop a video or audio file** (MP4, MOV, WebM, MP3, WAV…).
-2. **Transcribes it** with Whisper, running on your graphics card through WebGPU.
+2. **Transcribes it** on your graphics card (WebGPU). Choose *Fast*, *Better* or *Best*.
 3. **Finds the best moments** for shorts: strong opening hooks that make sense on their own.
-   - *Smart* (default): text signals pick the moments, a small local AI rates them and writes titles.
-   - *Instant*: no AI at all, works on any computer.
-   - *Everything*: the AI reads the whole transcript (slow, best with a strong GPU).
+   - *Smart* (default): transcript signals pick the moments, an on-device AI rates them and writes titles.
+   - *Deep*: a stronger on-device AI for computers with a fast graphics card.
+   - *Instant*: no AI download at all, works on any computer.
 4. **Exports vertical 9:16 MP4s** (1080×1920 or 720×1280):
    - crop that **follows the speaker's face**, a fixed crop, or the full frame on a blurred background;
    - **burned-in captions**, word by word or classic subtitles;

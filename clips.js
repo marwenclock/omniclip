@@ -108,7 +108,7 @@ export function instantClips(segments, n) {
     const clip = {
       start: ss[c.i].start, end: ss[b].end,
       title: ss[c.i].text.replace(/[.!?]$/, '').split(/\s+/).slice(0, 8).join(' '),
-      hook: 'Instant pick (no AI)',
+      hook: 'Picked from the transcript',
       score: Math.max(1, Math.min(10, Math.round((10 * c.v) / top))),
       text: ss.slice(c.i, b + 1).map((x) => x.text).join(' '),
     };
@@ -199,7 +199,7 @@ export async function rateClip(clip) {
   return {
     ...clip,
     title: String(j.title || clip.title).replace(/^["']|["']$/g, '').slice(0, 80),
-    hook: `Text signals ${clip.score}/10 · AI ${ai}/10`,
+    hook: `Hook strength ${clip.score}/10 · AI rating ${ai}/10`,
     score: Math.round((clip.score + ai) / 2),
   };
 }
