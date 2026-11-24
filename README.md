@@ -3,6 +3,8 @@
 **Turn long videos into vertical shorts with captions — free, in your browser, entirely on your device.**
 No account, no upload, no watermark. Your footage never leaves your computer.
 
+**Live site:** https://useomniclip.com/
+
 > **Early prototype.** It works end to end, but the look and feel is unfinished and it has only been tested in desktop Chrome/Edge.
 
 Sister project of [OMNIVIEWER](https://github.com/marwenclock/omniviewer3d), the free all-in-one 3D viewer.
