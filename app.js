@@ -439,14 +439,14 @@ function repick(srcId, n) {
 
 // ---------- sample ----------
 $('trySample').onclick = async () => {
-  $('trySample').disabled = true; $('trySample').textContent = 'Loading the sample…';
+  $('trySample').disabled = true; $('trySample').querySelector('span').textContent = 'Loading the sample…';
   try {
     const [audio, segs] = await Promise.all([fetch('sample/podcast.m4a').then((r) => { if (!r.ok) throw new Error('sample missing'); return r.blob(); }), fetch('sample/podcast.json').then((r) => r.json())]);
     const file = new File([audio], 'Sample podcast.m4a', { type: 'audio/mp4', lastModified: 1764000000000 });
     $('finder').value = 'instant';
     await startFile(file, 'shorts', { segments: segs });
     loadOptions();
-  } catch (e) { announce(`The sample couldn’t load: ${e.message}`); $('trySample').disabled = false; $('trySample').textContent = 'Try a sample podcast'; }
+  } catch (e) { announce(`The sample couldn’t load: ${e.message}`); $('trySample').disabled = false; $('trySample').querySelector('span').textContent = 'Try a sample podcast'; }
 };
 
 // ---------- saved projects: drafts, project files, relinking ----------
@@ -458,7 +458,7 @@ async function renderDrafts() {
     const li = document.createElement('li');
     li.className = 'draft';
     li.innerHTML = `<div class="draft-main"><div class="draft-name">${esc(p.name)}</div><div class="draft-meta">${p.clips.length} clip${p.clips.length === 1 ? '' : 's'} · ${esc(p.sources.map((s) => s.name).join(', '))} · ${new Date(p.updated).toLocaleDateString()}</div></div>
-      <button class="btn btn-outline btn-sm" type="button" data-a="open">Open</button><button class="link-btn" type="button" data-a="rm" aria-label="Remove project ${esc(p.name)}">Remove</button>`;
+      <button class="btn btn-outline btn-sm" type="button" data-a="open">Open</button><button class="btn btn-outline btn-sm" type="button" data-a="rm" aria-label="Remove project ${esc(p.name)}">Remove</button>`;
     li.querySelector('[data-a="open"]').onclick = () => relink(p);
     li.querySelector('[data-a="rm"]').onclick = async () => {
       if (await ask('Remove this project?', `<p>“${esc(p.name)}” and its clips will be removed from this device. Your video files are not touched.</p>`, [{ label: 'Cancel', value: false }, { label: 'Remove', value: true, solid: true }]) !== true) return;

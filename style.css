@@ -163,17 +163,18 @@ select option { background: #161616; color: var(--ink); }
 .opt-warn::before, .notice::before { content: '!'; display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 11px; font-weight: 700; }
 .opt-warn .link-btn { color: var(--ink); font-weight: 600; }
 .gpu-note { margin: 10px 0 0; padding: 8px 14px; border: 1px solid var(--line-2); border-radius: 12px; font-size: 12.5px; color: var(--ink-2); max-width: 560px; }
-.start-links { margin: 18px 0 0; font-size: 12.5px; color: var(--muted); }
+.start-links { margin: 18px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .drafts { width: 100%; margin-top: 30px; text-align: left; }
 .drafts h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 8px; }
 .drafts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .draft { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .draft-main { flex: 1; min-width: 0; }
+.draft .btn + .btn { margin-left: -6px; }
 .draft-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .draft-meta { font: 11px var(--mono); color: var(--muted); }
-.facts { list-style: none; padding: 0; margin: 36px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 20px; font-size: 12.5px; color: var(--muted); }
-.facts li { display: inline-flex; align-items: center; gap: 7px; }
-.facts li::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.facts { list-style: none; padding: 0; margin: 36px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.facts li { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+.facts li svg { width: 14px; height: 14px; color: var(--ink); flex: none; }
 
 /* ------------------------------------------------------------ editor grid */
 body.working { height: 100%; overflow: hidden; }
