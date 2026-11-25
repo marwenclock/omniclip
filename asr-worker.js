@@ -1,7 +1,7 @@
 // Speech-to-text worker: runs Whisper on the GPU (WebGPU) with transformers.js.
 // Receives 16 kHz mono audio, transcribes it in 30 s windows and streams the
 // timed segments back so the page can show progress as it goes.
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 
 env.allowLocalModels = false;
 

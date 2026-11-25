@@ -3,15 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>OMNICLIP · Turn long videos into shorts, free and on your device · by BANKASI MEDIA</title>
-<meta name="description" content="Turn long videos and podcasts into vertical shorts with captions. Free, in your browser, processed on your device. No upload, no account, no watermark.">
+<title>OMNICLIP · Free shorts maker and video editor in your browser · by BANKASI MEDIA</title>
+<meta name="description" content="Turn long videos and podcasts into vertical shorts with captions, or cut a video by hand. Free, in your browser, processed on your device. No upload, no account, no watermark.">
 <meta name="theme-color" content="#0a0a0a">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OMNICLIP">
 <meta property="og:title" content="OMNICLIP · Long video in, shorts out">
-<meta property="og:description" content="Free on-device shorts maker: finds the best moments, follows the speaker, burns in captions. Nothing is uploaded.">
+<meta property="og:description" content="Free on-device shorts maker and editor: finds the best moments, follows the speaker, burns in captions. Nothing is uploaded.">
 <meta property="og:url" content="https://useomniclip.com/">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://useomniclip.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://useomniclip.com/og.png">
 <link rel="canonical" href="https://useomniclip.com/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
@@ -29,14 +33,34 @@
   <a class="logo-by" href="https://bankasimedia.com" target="_blank" rel="noopener" title="Visit bankasimedia.com"><span class="logo-byword">by</span><span class="logo-bankasi">BANKASI</span><sup class="logo-sup">MEDIA</sup></a>
 
   <div class="top-file" id="topFile" hidden>
-    <span class="tf-name" id="fileName"></span>
+    <input class="proj-name" id="projName" aria-label="Project name" spellcheck="false">
     <span class="tf-meta" id="fileMeta"></span>
+    <span class="save-state" id="saveState"></span>
   </div>
 
   <nav class="top-right" aria-label="Site">
-    <button class="tb" id="newVideo" hidden>
+    <span class="work-only" hidden>
+      <button class="tb tb-icon" id="undoBtn" type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5 4 8.5 7.5 12M4.5 8.5H12a4 4 0 0 1 0 8h-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="tb tb-icon" id="redoBtn" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 5 16 8.5 12.5 12M15.5 8.5H8a4 4 0 0 0 0 8h2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="menu-wrap">
+        <button class="tb" id="projectBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="projectMenu" aria-label="Project menu" title="Project">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h3.2l1.6 1.8h6.2A1.5 1.5 0 0 1 17 7.3v7.2a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>Project</span>
+        </button>
+        <div class="menu" id="projectMenu" role="menu" hidden>
+          <button role="menuitem" type="button" data-act="saveFile">Save project file…</button>
+          <button role="menuitem" type="button" data-act="openFile">Open project file…</button>
+          <button role="menuitem" type="button" data-act="addMedia">Add another video…</button>
+          <button role="menuitem" type="button" data-act="storage">Storage on this device…</button>
+        </div>
+      </span>
+    </span>
+    <button class="tb" id="newVideo" aria-label="New video" title="New video" hidden>
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <span>New video</span>
+      <span>New</span>
+    </button>
+    <button class="tb" id="aboutBtn" type="button" aria-label="About and support" title="About and support">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.8a2.1 2.1 0 1 1 3 1.9c-.6.3-1 .8-1 1.5v.4M10 14h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>About</span>
     </button>
     <a class="tb tb-icon" href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener" title="Open source on GitHub" aria-label="Source code on GitHub">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 1.8a8.2 8.2 0 0 0-2.6 16c.4.1.6-.2.6-.4v-1.5c-2.3.5-2.8-1-2.8-1-.4-1-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.3.9 1.3.9.7 1.3 2 .9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.7-.9-3.7-4 0-.9.3-1.6.9-2.2-.1-.2-.4-1 .1-2.2 0 0 .7-.2 2.3.9a7.8 7.8 0 0 1 4.1 0c1.6-1.1 2.3-.9 2.3-.9.5 1.2.2 2 .1 2.2.5.6.9 1.3.9 2.2 0 3.2-1.9 3.8-3.7 4 .3.3.6.8.6 1.5v2.3c0 .2.2.5.6.4A8.2 8.2 0 0 0 10 1.8z"/></svg>
@@ -48,150 +72,429 @@
   <!-- ============================== start ============================== -->
   <section class="start" id="setup">
     <h1>Long video in.<br>Shorts out.</h1>
-    <p class="lede">Drop a video or podcast. OMNICLIP finds the best moments and turns them into vertical shorts with captions, right in your browser. Nothing is uploaded.</p>
+    <p class="lede">Find the best moments automatically, or cut a video by hand. Vertical shorts with captions, made right in your browser. Nothing is uploaded.</p>
 
-    <label class="drop" id="drop" for="file">
-      <input type="file" id="file" accept="video/*,audio/*" hidden>
+    <div class="drop" id="drop">
       <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 9.4v5.2l4-2.6z" fill="currentColor"/></svg>
-      <span class="drop-title">Drop a video or podcast</span>
-      <span class="drop-sub">MP4, MOV, WebM, MP3, WAV · any length</span>
-      <span class="btn btn-solid">Choose a file</span>
-    </label>
-
-    <div class="pills" id="options">
-      <label class="pill-select"><span>Shorts</span>
-        <select id="count"><option value="auto" selected>Auto</option><option>3</option><option>5</option><option>8</option><option>12</option><option>20</option></select>
-      </label>
-      <label class="pill-select"><span>Language</span>
-        <select id="lang">
-          <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
-          <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ar">Arabic</option>
-        </select>
-      </label>
-      <label class="pill-select"><span>Picking</span>
-        <select id="finder"><option value="smart">Smart</option><option value="deep">Deep</option><option value="instant">Instant</option></select>
-      </label>
-      <label class="pill-select"><span>Accuracy</span>
-        <select id="quality"><option value="fast">Fast</option><option value="better">Better</option><option value="best">Best</option></select>
-      </label>
+      <span class="drop-title">Drop a video or podcast, or choose how to start</span>
+      <span class="drop-sub">MP4, MOV, WebM, MP3, WAV · long videos work best as MP4 or MOV</span>
+      <div class="entry">
+        <button class="btn btn-solid btn-lg" id="pickShorts" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l1.6 4.2 4.4.3-3.4 2.8 1.1 4.3L10 11.7 6.3 14.1l1.1-4.3L4 7l4.4-.3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Create shorts</button>
+        <button class="btn btn-solid btn-lg" id="pickEdit" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5.5" cy="6" r="2.3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.5" cy="14" r="2.3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 7.3 16 14M7.4 12.7 16 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Edit a video</button>
+      </div>
+      <p class="entry-help"><b>Create shorts</b> transcribes on your device and picks the strongest moments. <b>Edit a video</b> opens it straight away to cut by hand, no transcription needed.</p>
     </div>
-    <p class="opt-help" id="optHelp"></p>
-    <p class="opt-warn" id="optWarn" hidden><span></span><button class="link-btn" type="button"></button></p>
+    <input type="file" id="file" accept="video/*,audio/*" class="sr-only" tabindex="-1" aria-hidden="true">
+    <input type="file" id="mediaFile" accept="video/*,audio/*" class="sr-only" tabindex="-1" aria-hidden="true">
+    <input type="file" id="projFile" accept=".json,application/json" class="sr-only" tabindex="-1" aria-hidden="true">
+    <input type="file" id="subFile" accept=".srt,.vtt,text/vtt,application/x-subrip" class="sr-only" tabindex="-1" aria-hidden="true">
+    <input type="file" id="ovFile" accept="image/*,video/*" class="sr-only" tabindex="-1" aria-hidden="true">
+
+    <details class="settings" id="settings">
+      <summary><span>Create shorts settings</span> <span class="settings-sum" id="settingsSum"></span></summary>
+      <div class="pills" id="options">
+        <label class="pill-select"><span>Shorts</span>
+          <select id="count"><option value="auto" selected>Auto</option><option>3</option><option>5</option><option>8</option><option>12</option><option>20</option></select>
+        </label>
+        <label class="pill-select"><span>Language</span>
+          <select id="lang">
+            <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+            <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ar">Arabic</option>
+          </select>
+        </label>
+        <label class="pill-select"><span>Picking</span>
+          <select id="finder"><option value="smart">Smart</option><option value="deep">Deep</option><option value="instant">Instant</option></select>
+        </label>
+        <label class="pill-select"><span>Accuracy</span>
+          <select id="quality"><option value="fast">Fast</option><option value="better">Better</option><option value="best">Best</option></select>
+        </label>
+      </div>
+      <p class="opt-help" id="optHelp"></p>
+      <p class="opt-warn" id="optWarn" hidden><span></span><button class="link-btn" type="button"></button></p>
+    </details>
     <p class="gpu-note" id="gpuNote" hidden></p>
+    <p class="gpu-note" id="exportNote" hidden></p>
+    <p class="start-links"><button class="link-btn" id="trySample" type="button">Try a sample podcast</button> · <button class="link-btn" id="openProj" type="button">Open a project file</button></p>
+
+    <section class="drafts" id="drafts" hidden aria-labelledby="draftsTitle">
+      <h2 id="draftsTitle">Recent projects on this device</h2>
+      <ul id="draftList"></ul>
+    </section>
 
     <ul class="facts">
-      <li>Nothing uploaded</li><li>No account</li><li>No watermark</li><li>Free and open source</li>
+      <li>Nothing uploaded</li><li>No account</li><li>No watermark</li><li>No ads</li><li>Free and open source</li>
     </ul>
   </section>
 
-  <!-- ============================== workspace ============================== -->
+  <!-- ============================== editor ============================== -->
   <section class="work" id="work" hidden>
-    <div class="stage-col">
-      <div class="progress-pill" id="progress" hidden>
-        <span class="spin" aria-hidden="true"></span>
-        <span class="pp-text" id="ppText">Starting…</span>
-        <span class="pp-step" id="ppStep"></span>
-        <span class="pp-bar"><i id="ppBar"></i></span>
+    <aside class="bin" id="bin" aria-label="Clips, transcript and media">
+      <div class="tabs" role="tablist" aria-label="Clip bin">
+        <button class="tab active" role="tab" id="tabClips" aria-controls="clipsPane" aria-selected="true">Clips <span class="count" id="clipCount"></span></button>
+        <button class="tab" role="tab" id="tabTranscript" aria-controls="transcriptPane" aria-selected="false" tabindex="-1">Transcript</button>
+        <button class="tab" role="tab" id="tabMedia" aria-controls="mediaPane" aria-selected="false" tabindex="-1">Media</button>
       </div>
 
+      <div class="pane" id="clipsPane" role="tabpanel" aria-labelledby="tabClips">
+        <div class="notice" id="notice" hidden><p></p><button class="btn btn-outline btn-sm" type="button"></button></div>
+        <div class="pane-tools">
+          <button class="btn btn-outline btn-sm" id="newClip" type="button" title="New 10-second clip at the playhead">+ New clip</button>
+          <label class="mini-select"><span class="sr-only">Sort clips</span><select id="sortClips"><option value="order">Your order</option><option value="score">Strongest first</option><option value="time">Time in video</option></select></label>
+        </div>
+        <ol class="clips" id="clips" aria-label="Clips"></ol>
+        <div class="empty" id="clipsEmpty">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+          <p id="resultsSub">Your shorts will show up here.</p>
+          <div class="empty-actions" id="emptyActions" hidden>
+            <button class="btn btn-solid btn-sm" id="emptyWhole" type="button">Use the whole video</button>
+            <button class="btn btn-outline btn-sm" id="emptyFromText" type="button">Choose transcript lines</button>
+          </div>
+        </div>
+        <div class="pane-foot">
+          <button class="btn btn-solid" id="exAll" type="button" disabled>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="exAllLabel">Export all</span>
+          </button>
+          <button class="link-btn" id="json" type="button" disabled>Download clip list (.json)</button>
+        </div>
+      </div>
+
+      <div class="pane" id="transcriptPane" role="tabpanel" aria-labelledby="tabTranscript" hidden>
+        <div class="pane-tools wrap">
+          <div class="seg" role="radiogroup" aria-label="Transcript mode">
+            <label><input type="radio" name="tmode" value="select" checked><span>Select lines</span></label>
+            <label><input type="radio" name="tmode" value="edit"><span>Fix text</span></label>
+          </div>
+          <div class="search">
+            <input id="tSearch" type="search" placeholder="Find" aria-label="Find in transcript" spellcheck="false">
+            <span class="count" id="tCount" aria-live="polite"></span>
+            <button class="tb tb-icon sm" id="tPrev" type="button" aria-label="Previous match">↑</button>
+            <button class="tb tb-icon sm" id="tNext" type="button" aria-label="Next match">↓</button>
+          </div>
+        </div>
+        <div class="pane-tools wrap">
+          <button class="btn btn-solid btn-sm" id="fromSel" type="button" disabled>Make a short from selected lines</button>
+          <button class="link-btn" id="srt" type="button" disabled>Full subtitles (.srt)</button>
+          <button class="link-btn" id="importSub" type="button">Import .srt / .vtt</button>
+        </div>
+        <p class="hint" id="tHint">Click the first line, then Shift-click (or tap) the last line of your short. The time button plays from that line.</p>
+        <div id="transcript"></div>
+        <div class="hint" id="transcriptEmpty">The transcript appears here as it’s written. <button class="link-btn" id="transcribeNow" type="button" hidden>Transcribe this video</button></div>
+      </div>
+
+      <div class="pane" id="mediaPane" role="tabpanel" aria-labelledby="tabMedia" hidden>
+        <p class="hint">Videos in this project. Add another to cut between sources in one short.</p>
+        <ul class="media-list" id="mediaList"></ul>
+        <button class="btn btn-outline btn-sm" id="addMedia" type="button">+ Add another video</button>
+      </div>
+    </aside>
+
+    <section class="center" aria-label="Monitor">
+      <div class="monitor-head">
+        <button class="clip-switch" id="clipSwitch" type="button" aria-label="Choose a clip"><span id="clipSwitchText">No clip</span> <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        <div class="seg" role="radiogroup" aria-label="Monitor view">
+          <label><input type="radio" name="view" value="output" checked><span>Output</span></label>
+          <label><input type="radio" name="view" value="source"><span>Source</span></label>
+        </div>
+        <span class="mon-name" id="monName"></span>
+        <label class="check"><input type="checkbox" id="guides"> Safe area</label>
+      </div>
       <div class="stage" id="stage">
-        <video id="player" controls playsinline></video>
+        <video id="player" playsinline preload="auto"></video>
+        <canvas id="out" aria-label="Output preview of the selected clip"></canvas>
         <div class="crop" id="crop" hidden>
           <button class="crop-handle" id="cropHandle" type="button" title="Drag to choose what stays in the frame">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6 2 10l4 4M14 6l4 4-4 4M2 10h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span id="cropLabel">Drag</span>
           </button>
         </div>
-      </div>
-
-      <div class="selected" id="selected" hidden>
-        <div class="sel-main">
-          <input class="sel-title" id="selTitle" aria-label="Short title (shown on the title card)" spellcheck="false">
-          <span class="sel-time" id="selTime"></span>
+        <div class="progress-pill" id="progress" hidden>
+          <span class="spin" aria-hidden="true"></span>
+          <span class="pp-text" id="ppText">Starting…</span>
+          <span class="pp-step" id="ppStep"></span>
+          <button class="link-btn" id="cancelRun" type="button">Cancel</button>
+          <span class="pp-bar"><i id="ppBar"></i></span>
         </div>
-        <div class="sel-actions">
-          <div class="nudge">
-            <span>Start</span><button data-k="start" data-d="-1" title="Start 1 second earlier">−1s</button><button data-k="start" data-d="1" title="Start 1 second later">+1s</button>
+      </div>
+      <div class="transport">
+        <button class="tb tb-icon play" id="playBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10l8-5z" fill="currentColor"/></svg></button>
+        <span class="tc-now" id="tcNow">0:00.0</span><span class="tc-dur" id="tcDur">/ 0:00.0</span>
+        <span class="src-only" hidden>
+          <button class="btn btn-outline btn-sm" id="markIn" type="button" title="Set In at the playhead (I)">In <span id="inVal">–</span></button>
+          <button class="btn btn-outline btn-sm" id="markOut" type="button" title="Set Out at the playhead (O)">Out <span id="outVal">–</span></button>
+          <button class="btn btn-outline btn-sm" id="addRange" type="button" disabled title="Add In–Out to the selected clip">Add to clip</button>
+          <button class="btn btn-solid btn-sm" id="newFromIO" type="button" disabled>New clip</button>
+        </span>
+        <label class="check"><input type="checkbox" id="loop"> Loop</label>
+      </div>
+    </section>
+
+    <aside class="inspector" id="inspector" aria-label="Inspector">
+      <div class="tabs" role="tablist" aria-label="Inspector">
+        <button class="tab active" role="tab" id="itTrim" aria-controls="ipTrim" aria-selected="true">Trim</button>
+        <button class="tab" role="tab" id="itCaptions" aria-controls="ipCaptions" aria-selected="false" tabindex="-1">Captions</button>
+        <button class="tab" role="tab" id="itFrame" aria-controls="ipFrame" aria-selected="false" tabindex="-1">Frame</button>
+        <button class="tab" role="tab" id="itAudio" aria-controls="ipAudio" aria-selected="false" tabindex="-1">Audio</button>
+        <button class="tab" role="tab" id="itExport" aria-controls="ipExport" aria-selected="false" tabindex="-1">Export</button>
+      </div>
+      <p class="no-clip" id="noClip">Select or create a clip to edit it.</p>
+
+      <div class="pane ipane" id="ipTrim" role="tabpanel" aria-labelledby="itTrim">
+        <label class="field"><span>Clip name</span><input id="clipName" spellcheck="false" placeholder="Name in your list and file name"></label>
+        <label class="field"><span>On-screen title</span><input id="clipTitle" spellcheck="false" placeholder="Shown on the title card"></label>
+        <div class="field"><span>Title card</span>
+          <div class="seg" role="radiogroup" aria-label="Title card">
+            <label><input type="radio" name="st-title" value="intro"><span>Intro</span></label>
+            <label><input type="radio" name="st-title" value="always"><span>Always</span></label>
+            <label><input type="radio" name="st-title" value="none"><span>Off</span></label>
           </div>
-          <div class="nudge">
-            <span>End</span><button data-k="end" data-d="-1" title="End 1 second earlier">−1s</button><button data-k="end" data-d="1" title="End 1 second later">+1s</button>
+        </div>
+        <label class="field slider"><span>Intro length <output data-out="titleDur"></output></span><input type="range" data-style="titleDur" min="1" max="8" step="0.5"></label>
+        <div class="field"><span>Ranges <small>(played in this order)</small></span>
+          <ol class="ranges" id="ranges"></ol>
+          <div class="row">
+            <button class="btn btn-outline btn-sm" id="splitBtn" type="button" title="Split at the playhead (S)">Split at playhead</button>
+            <button class="btn btn-outline btn-sm" id="pausesBtn" type="button" title="Find long pauses and cut them out">Remove pauses…</button>
           </div>
-          <button class="btn btn-outline" id="selPlay">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10l8-5z" fill="currentColor"/></svg>Preview
-          </button>
-          <button class="btn btn-solid" id="selExport">Export</button>
+          <div class="pauses" id="pausesBox" hidden>
+            <label class="field slider"><span>Pauses longer than <output id="pauseMinOut"></output></span><input type="range" id="pauseMin" min="0.3" max="2" step="0.1" value="0.7"></label>
+            <label class="field slider"><span>Quiet below <output id="pauseThrOut"></output></span><input type="range" id="pauseThr" min="0.005" max="0.08" step="0.005" value="0.02"></label>
+            <p class="hint" id="pauseInfo"></p>
+            <div class="row"><button class="btn btn-solid btn-sm" id="pauseApply" type="button" disabled>Cut these pauses</button><button class="btn btn-outline btn-sm" id="pauseCancel" type="button">Close</button></div>
+          </div>
         </div>
-        <div class="sel-progress" id="selProgress" hidden><span class="pp-bar"><i></i></span><span class="lbl"></span></div>
-      </div>
-
-      <div class="dock" id="dock">
-        <div class="dock-group" role="radiogroup" aria-label="Framing">
-          <span class="dock-label">Frame</span>
-          <label><input type="radio" name="layout" value="auto" checked><span>Follow speaker</span></label>
-          <label><input type="radio" name="layout" value="crop"><span>Fixed</span></label>
-          <label><input type="radio" name="layout" value="blur"><span>Full + blur</span></label>
-        </div>
-        <div class="dock-group" role="radiogroup" aria-label="Captions">
-          <span class="dock-label">Captions</span>
-          <label><input type="radio" name="caps" value="pop" checked><span>Word by word</span></label>
-          <label><input type="radio" name="caps" value="classic"><span>Subtitles</span></label>
-          <label><input type="radio" name="caps" value="none"><span>Off</span></label>
-        </div>
-        <div class="dock-group" role="radiogroup" aria-label="Title card">
-          <span class="dock-label">Title</span>
-          <label><input type="radio" name="title" value="intro" checked><span>Intro</span></label>
-          <label><input type="radio" name="title" value="always"><span>Always</span></label>
-          <label><input type="radio" name="title" value="none"><span>Off</span></label>
-        </div>
-        <div class="dock-group" role="radiogroup" aria-label="Size">
-          <label><input type="radio" name="size" value="1080" checked><span>1080p</span></label>
-          <label><input type="radio" name="size" value="720"><span>720p</span></label>
-        </div>
-      </div>
-      <p class="export-note" id="exNote">Exports play through in real time, so a 30-second short takes about 30 seconds. Keep this tab open.</p>
-    </div>
-
-    <aside class="side" aria-label="Shorts and transcript">
-      <div class="side-tabs" role="tablist">
-        <button class="side-tab active" role="tab" data-tab="clipsPane" aria-selected="true">Shorts <span class="count" id="clipCount"></span></button>
-        <button class="side-tab" role="tab" data-tab="transcriptPane" aria-selected="false">Transcript</button>
-      </div>
-
-      <div class="pane" id="clipsPane">
-        <div class="notice" id="notice" hidden><p></p><button class="btn btn-outline btn-sm" type="button"></button></div>
-        <div class="clips" id="clips"></div>
-        <div class="empty" id="clipsEmpty">
-          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-          <p id="resultsSub">Your shorts will show up here.</p>
-        </div>
-        <div class="pane-foot">
-          <button class="btn btn-solid" id="exAll" disabled>
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="exAllLabel">Export all</span>
-          </button>
-          <p class="keys"><kbd>↑</kbd><kbd>↓</kbd> choose <kbd>Space</kbd> preview <kbd>E</kbd> export</p>
-          <button class="link-btn" id="json" disabled>Download clip list (.json)</button>
+        <div class="field"><span>Speed</span>
+          <div class="seg" role="radiogroup" aria-label="Speed">
+            <label><input type="radio" name="st-speed" value="0.5"><span>0.5×</span></label>
+            <label><input type="radio" name="st-speed" value="0.75"><span>0.75×</span></label>
+            <label><input type="radio" name="st-speed" value="1"><span>1×</span></label>
+            <label><input type="radio" name="st-speed" value="1.25"><span>1.25×</span></label>
+            <label><input type="radio" name="st-speed" value="1.5"><span>1.5×</span></label>
+            <label><input type="radio" name="st-speed" value="2"><span>2×</span></label>
+          </div>
         </div>
       </div>
 
-      <div class="pane" id="transcriptPane" hidden>
-        <div class="pane-head">
-          <button class="btn btn-outline btn-sm" id="fromSel">Make a short from selected text</button>
-          <button class="link-btn" id="srt" disabled>Subtitles (.srt)</button>
+      <div class="pane ipane" id="ipCaptions" role="tabpanel" aria-labelledby="itCaptions" hidden>
+        <div class="field"><span>Captions</span>
+          <div class="seg" role="radiogroup" aria-label="Captions">
+            <label><input type="radio" name="st-captions" value="pop"><span>Word by word</span></label>
+            <label><input type="radio" name="st-captions" value="classic"><span>Subtitles</span></label>
+            <label><input type="radio" name="st-captions" value="none"><span>Off</span></label>
+          </div>
         </div>
-        <p class="hint">Click a time to jump there. Click any word to fix it; captions use your fix.</p>
-        <div id="transcript"><p class="hint" id="transcriptEmpty">The transcript appears here as it’s written.</p></div>
+        <p class="hint" id="capNoText" hidden>This video has no transcript yet. <button class="link-btn" id="capTranscribe" type="button">Transcribe it</button> or <button class="link-btn" id="capImport" type="button">import subtitles</button>.</p>
+        <div class="field"><span>Presets</span><div class="presets" id="presets"></div></div>
+        <div class="grid2">
+          <label class="field"><span>Font</span><select data-style="font"></select></label>
+          <label class="field"><span>Weight</span><select data-style="weight"><option value="500">Regular</option><option value="700">Bold</option><option value="800">Extra bold</option><option value="900">Black</option></select></label>
+          <label class="field"><span>Text colour</span><input type="color" data-style="color"></label>
+          <label class="field"><span>Spoken word</span><input type="color" data-style="hi"></label>
+        </div>
+        <div class="field"><span>Letters</span>
+          <div class="seg" role="radiogroup" aria-label="Letter case">
+            <label><input type="radio" name="st-case" value="upper"><span>UPPERCASE</span></label>
+            <label><input type="radio" name="st-case" value="none"><span>As written</span></label>
+          </div>
+        </div>
+        <div class="field"><span>Edge</span>
+          <div class="seg" role="radiogroup" aria-label="Caption edge">
+            <label><input type="radio" name="st-outline" value="stroke"><span>Outline</span></label>
+            <label><input type="radio" name="st-outline" value="shadow"><span>Shadow</span></label>
+            <label><input type="radio" name="st-outline" value="box"><span>Box</span></label>
+            <label><input type="radio" name="st-outline" value="none"><span>None</span></label>
+          </div>
+        </div>
+        <label class="field slider"><span>Size <output data-out="size"></output></span><input type="range" data-style="size" min="0.5" max="1.8" step="0.05"></label>
+        <label class="field slider"><span>Height on screen <output data-out="y"></output></span><input type="range" data-style="y" min="0.15" max="0.92" step="0.01"></label>
+        <label class="field slider"><span>Words at a time <output data-out="words"></output></span><input type="range" data-style="words" min="1" max="12" step="1"></label>
+        <div class="field"><span>Direction</span>
+          <div class="seg" role="radiogroup" aria-label="Text direction">
+            <label><input type="radio" name="st-dir" value="auto"><span>Auto</span></label>
+            <label><input type="radio" name="st-dir" value="ltr"><span>Left to right</span></label>
+            <label><input type="radio" name="st-dir" value="rtl"><span>Right to left</span></label>
+          </div>
+        </div>
+        <p class="hint">Word timings are estimated from each transcript line. Fix words in the Transcript tab.</p>
+        <div class="row panel-actions" data-keys="captions,font,weight,case,size,y,color,hi,outline,words,dir">
+          <button class="btn btn-outline btn-sm" data-act="savePreset" type="button">Save as preset</button>
+          <button class="btn btn-outline btn-sm" data-act="applyAll" type="button">Apply to all clips</button>
+          <button class="link-btn" data-act="reset" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div class="pane ipane" id="ipFrame" role="tabpanel" aria-labelledby="itFrame" hidden>
+        <div class="field"><span>Shape</span>
+          <div class="seg" role="radiogroup" aria-label="Output shape">
+            <label><input type="radio" name="st-aspect" value="9:16"><span>9:16</span></label>
+            <label><input type="radio" name="st-aspect" value="4:5"><span>4:5</span></label>
+            <label><input type="radio" name="st-aspect" value="1:1"><span>1:1</span></label>
+            <label><input type="radio" name="st-aspect" value="16:9"><span>16:9</span></label>
+            <label><input type="radio" name="st-aspect" value="original"><span>Original</span></label>
+          </div>
+        </div>
+        <div class="field"><span>Framing</span>
+          <div class="seg" role="radiogroup" aria-label="Framing">
+            <label><input type="radio" name="st-layout" value="auto"><span>Follow speaker</span></label>
+            <label><input type="radio" name="st-layout" value="crop"><span>Fixed</span></label>
+            <label><input type="radio" name="st-layout" value="blur"><span>Full + blur</span></label>
+            <label><input type="radio" name="st-layout" value="fit"><span>Fit</span></label>
+          </div>
+        </div>
+        <p class="hint framing-note" id="framingNote"></p>
+        <button class="btn btn-outline btn-sm" id="trackBtn" type="button" hidden>Find the speaker now</button>
+        <label class="field slider"><span>Left / right <output data-out="pos"></output></span><input type="range" data-style="pos" min="0" max="1" step="0.01"></label>
+        <label class="field slider"><span>Up / down <output data-out="posY"></output></span><input type="range" data-style="posY" min="0" max="1" step="0.01"></label>
+        <label class="field slider"><span>Zoom <output data-out="zoom"></output></span><input type="range" data-style="zoom" min="1" max="3" step="0.05"></label>
+        <div class="field"><span>Rotate and mirror</span>
+          <div class="row">
+            <button class="btn btn-outline btn-sm" id="rotL" type="button" aria-label="Rotate 90 degrees left">⟲ 90°</button>
+            <button class="btn btn-outline btn-sm" id="rotR" type="button" aria-label="Rotate 90 degrees right">⟳ 90°</button>
+            <label class="check"><input type="checkbox" data-style="flip"> Mirror</label>
+          </div>
+        </div>
+        <div class="field"><span>Overlay <small>(logo, image or cutaway)</small></span>
+          <div class="row">
+            <button class="btn btn-outline btn-sm" id="ovAdd" type="button">Add image or video…</button>
+            <button class="link-btn" id="ovRemove" type="button" hidden>Remove</button>
+          </div>
+          <div id="ovControls" hidden>
+            <label class="field slider"><span>Size <output data-ovout="w"></output></span><input type="range" data-ov="w" min="0.05" max="1" step="0.01"></label>
+            <label class="field slider"><span>Left / right <output data-ovout="x"></output></span><input type="range" data-ov="x" min="0" max="1" step="0.01"></label>
+            <label class="field slider"><span>Up / down <output data-ovout="y"></output></span><input type="range" data-ov="y" min="0" max="1" step="0.01"></label>
+            <label class="field slider"><span>Opacity <output data-ovout="opacity"></output></span><input type="range" data-ov="opacity" min="0.1" max="1" step="0.05"></label>
+            <div class="grid2">
+              <label class="field"><span>From (seconds)</span><input data-ov="start" inputmode="decimal" class="tc"></label>
+              <label class="field"><span>Until (empty = end)</span><input data-ov="end" inputmode="decimal" class="tc"></label>
+            </div>
+          </div>
+        </div>
+        <div class="row panel-actions" data-keys="aspect,layout,pos,posY,zoom,rotate,flip">
+          <button class="btn btn-outline btn-sm" data-act="applyAll" type="button">Apply to all clips</button>
+          <button class="link-btn" data-act="reset" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div class="pane ipane" id="ipAudio" role="tabpanel" aria-labelledby="itAudio" hidden>
+        <label class="field slider"><span>Volume <output data-out="gain"></output></span><input type="range" data-style="gain" min="-18" max="12" step="0.5"></label>
+        <label class="check"><input type="checkbox" data-style="mute"> Mute this clip</label>
+        <label class="field slider"><span>Fade in <output data-out="fadeIn"></output></span><input type="range" data-style="fadeIn" min="0" max="3" step="0.1"></label>
+        <label class="field slider"><span>Fade out <output data-out="fadeOut"></output></span><input type="range" data-style="fadeOut" min="0" max="3" step="0.1"></label>
+        <p class="hint">The monitor previews up to normal volume; boosts above 0 dB are applied in the export.</p>
+        <div class="row panel-actions" data-keys="gain,mute,fadeIn,fadeOut">
+          <button class="btn btn-outline btn-sm" data-act="applyAll" type="button">Apply to all clips</button>
+          <button class="link-btn" data-act="reset" type="button">Reset</button>
+        </div>
+      </div>
+
+      <div class="pane ipane" id="ipExport" role="tabpanel" aria-labelledby="itExport" hidden>
+        <div class="field"><span>Resolution</span>
+          <div class="seg" role="radiogroup" aria-label="Resolution">
+            <label><input type="radio" name="st-res" value="1080"><span>1080p</span></label>
+            <label><input type="radio" name="st-res" value="720"><span>720p</span></label>
+          </div>
+        </div>
+        <p class="summary" id="exSummary"></p>
+        <label class="check"><input type="checkbox" id="fastExport"> Background-safe export (beta)</label>
+        <p class="hint">Renders frame by frame instead of playing in real time, so it keeps going in a background tab. Faster for audio-only shorts; for video it is usually slower than the normal export. Experimental; needs Chrome or Edge.</p>
+        <div class="row">
+          <button class="btn btn-solid" id="exportOne" type="button">Export this clip</button>
+          <a class="btn btn-outline" id="dlOne" hidden>Download</a>
+        </div>
+        <div class="row">
+          <button class="link-btn" id="clipSrt" type="button">Subtitles for this clip (.srt)</button>
+          <button class="link-btn" id="dupAspect" type="button">Duplicate in another shape…</button>
+        </div>
+        <div class="row panel-actions" data-keys="res">
+          <button class="btn btn-outline btn-sm" data-act="applyAll" type="button">Use this resolution for all clips</button>
+        </div>
       </div>
     </aside>
+
+    <section class="tl-wrap" aria-label="Timeline">
+      <div class="tl-tools">
+        <button class="tb sm" id="tlSplit" type="button" title="Split at the playhead (S)">Split</button>
+        <button class="tb sm" id="tlDelete" type="button" title="Delete the range under the playhead">Delete range</button>
+        <span class="tl-spacer"></span>
+        <button class="tb tb-icon sm" id="tlOut" type="button" aria-label="Zoom out">−</button>
+        <button class="tb sm" id="tlFit" type="button">Fit</button>
+        <button class="tb tb-icon sm" id="tlIn" type="button" aria-label="Zoom in">+</button>
+      </div>
+      <canvas id="timeline" tabindex="0" aria-label="Timeline. Left and right arrows move the playhead."></canvas>
+    </section>
   </section>
 </main>
+
+<section class="tray" id="tray" hidden aria-label="Exports">
+  <div class="tray-head">
+    <b>Exports <span class="count" id="trayCount"></span></b>
+    <button class="link-btn" id="trayZip" type="button" disabled>Download all (.zip)</button>
+    <button class="link-btn" id="trayClear" type="button">Clear finished</button>
+    <button class="tb tb-icon sm" id="trayToggle" type="button" aria-label="Collapse exports" aria-expanded="true">▾</button>
+  </div>
+  <ul class="tray-list" id="trayList"></ul>
+  <p class="tray-note" id="trayNote">Real-time exports play through the clip. Keep this tab visible.</p>
+</section>
 
 <footer class="statusbar">
   <span class="sb-left" id="status">Ready · drop a video anywhere</span>
   <span class="sb-right">© 2026 <a href="https://bankasimedia.com" target="_blank" rel="noopener">BANKASI MEDIA</a> · Free &amp; <a href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener">open source</a> · No ads</span>
 </footer>
 
-<div class="dropveil" id="dropVeil" hidden><div>Drop to start</div></div>
+<div class="dropveil" id="dropVeil" hidden>
+  <div class="dz" data-mode="shorts">Drop here to <b>create shorts</b></div>
+  <div class="dz" data-mode="edit">Drop here to <b>edit a video</b></div>
+</div>
+<p class="sr-only" id="announce" role="status" aria-live="polite"></p>
+
+<dialog class="modal" id="about" aria-labelledby="aboutTitle">
+  <h2 id="aboutTitle">About OMNICLIP</h2>
+  <p>OMNICLIP by BANKASI <sup>MEDIA</sup> is free and open source. No ads, no accounts, no watermark. Your videos are processed in your browser and are never uploaded.</p>
+  <div class="support-box">
+    <b><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16.5s-6-3.6-6-8.1A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1c0 4.5-6 8.1-6 8.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Keep it free</b>
+    <p>Hosting and new features cost time and money. Donations keep OMNICLIP free, ad-free and private for everyone.</p>
+    <span id="donateSlot"></span>
+    <p class="note">Other ways to help: share it with a creator who needs it, star it on GitHub, or report a video that doesn’t work.</p>
+  </div>
+  <h3>Keyboard shortcuts</h3>
+  <table class="keys-table">
+    <tr><td><kbd>Space</kbd></td><td>Play / pause</td><td><kbd>←</kbd><kbd>→</kbd></td><td>Step 0.1 s (Shift 1 s)</td></tr>
+    <tr><td><kbd>↑</kbd><kbd>↓</kbd></td><td>Previous / next clip</td><td><kbd>S</kbd></td><td>Split at playhead</td></tr>
+    <tr><td><kbd>I</kbd> <kbd>O</kbd></td><td>Set In / Out (Source view)</td><td><kbd>E</kbd></td><td>Export clip</td></tr>
+    <tr><td><kbd>Ctrl</kbd><kbd>Z</kbd></td><td>Undo</td><td><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Z</kbd></td><td>Redo</td></tr>
+  </table>
+  <label class="check"><input type="checkbox" id="singleKeys" checked> Single-key shortcuts (Space, S, I, O, E, arrows)</label>
+  <div class="modal-actions">
+    <a class="btn btn-outline" href="https://bankasimedia.com" target="_blank" rel="noopener">BANKASI MEDIA</a>
+    <a class="btn btn-outline" href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener">Source on GitHub</a>
+    <a class="btn btn-outline" href="https://github.com/marwenclock/omniclip/issues" target="_blank" rel="noopener">Report a problem</a>
+    <button class="btn btn-outline" id="storageBtn" type="button">Storage…</button>
+    <button class="btn btn-solid" data-close type="button">Close</button>
+  </div>
+</dialog>
+
+<dialog class="modal" id="storage" aria-labelledby="storageTitle">
+  <h2 id="storageTitle">Storage on this device</h2>
+  <p class="note" id="storageTotal"></p>
+  <ul class="store-list" id="storeList"></ul>
+  <div class="modal-actions"><button class="btn btn-solid" data-close type="button">Close</button></div>
+</dialog>
+
+<dialog class="modal" id="relink" aria-labelledby="relinkTitle">
+  <h2 id="relinkTitle">Find the video for this project</h2>
+  <p>Projects keep your edits, not the video itself. Choose the same file again to keep working.</p>
+  <ul class="store-list" id="relinkList"></ul>
+  <p class="note" id="relinkMsg" role="status"></p>
+  <div class="modal-actions"><button class="btn btn-outline" data-close type="button">Cancel</button><button class="btn btn-solid" id="relinkGo" type="button" disabled>Open project</button></div>
+</dialog>
+
+<dialog class="modal" id="ask" aria-labelledby="askTitle">
+  <h2 id="askTitle"></h2>
+  <div id="askBody"></div>
+  <div class="modal-actions" id="askActions"></div>
+</dialog>
 
 <script type="module" src="app.js"></script>
 </body>

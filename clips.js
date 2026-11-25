@@ -1,7 +1,11 @@
 // Clip picker: a small local LLM (WebLLM, runs on the GPU) reads the transcript
 // a few minutes at a time and proposes the best self-contained short in each
 // window. Results are then sanity-checked, de-duplicated and ranked.
-import * as webllm from 'https://esm.run/@mlc-ai/web-llm';
+// The AI library (several MB) is only fetched when Smart or Deep picking runs,
+// so a blocked or slow CDN never stops the rest of the app. Version pinned.
+const WEBLLM_URL = 'https://esm.run/@mlc-ai/web-llm@0.2.89';
+let webllmP = null;
+const webllm = () => (webllmP ??= import(WEBLLM_URL).catch((e) => { webllmP = null; throw e; }));
 
 let engine = null;
 let loadedModel = null;
@@ -16,7 +20,7 @@ export async function pickModel(preferred) {
 export async function loadLLM(model, onProgress) {
   if (engine && loadedModel === model) return;
   if (engine) await engine.unload();
-  engine = await webllm.CreateMLCEngine(model, {
+  engine = await (await webllm()).CreateMLCEngine(model, {
     initProgressCallback: (r) => onProgress(r.progress, r.text),
   });
   loadedModel = model;
@@ -91,6 +95,12 @@ const signal = (t) => 2 * (t.match(HOOK) || []).length + 1.5 * (t.match(STORY) |
   + 1.5 * (t.match(/\?/g) || []).length + 0.7 * (t.match(/[$£€%!]|\b\d{2,}\b/g) || []).length
   - 3 * (t.match(FILLER) || []).length;
 
+// A title from an opening line: whole if short, otherwise cut at a word with an ellipsis.
+export function shortTitle(text) {
+  const words = text.replace(/[.!?,;:]+$/, '').split(/\s+/).filter(Boolean);
+  return words.length <= 8 ? words.join(' ') : words.slice(0, 7).join(' ').replace(/[,;:]$/, '') + '…';
+}
+
 // Instant mode (no AI): every sentence is a candidate opening line. Score it
 // by its own hook signals (weighted most) plus the next few sentences, pick
 // the best non-overlapping starts, and run each to a sentence end at 25-55 s.
@@ -107,7 +117,7 @@ export function instantClips(segments, n) {
     while (b < ss.length - 1 && ss[b].end - ss[c.i].start < 25 && ss[b + 1].end - ss[c.i].start <= 55) b++;
     const clip = {
       start: ss[c.i].start, end: ss[b].end,
-      title: ss[c.i].text.replace(/[.!?]$/, '').split(/\s+/).slice(0, 8).join(' '),
+      title: shortTitle(ss[c.i].text),
       hook: 'Picked from the transcript',
       score: Math.max(1, Math.min(10, Math.round((10 * c.v) / top))),
       text: ss.slice(c.i, b + 1).map((x) => x.text).join(' '),

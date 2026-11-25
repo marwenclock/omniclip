@@ -24,7 +24,7 @@ function detector() {
 
 // Returns a function t -> crop position 0..1 (0 = left edge, 1 = right edge),
 // or null when no face was found in the clip.
-export async function trackSpeaker(url, clip, cropFrac, onProgress) {
+export async function trackSpeaker(url, clip, cropFrac, onProgress, signal) {
   const det = await detector();
   const v = document.createElement('video');
   v.src = url; v.muted = true; v.preload = 'auto';
@@ -56,8 +56,9 @@ export async function trackSpeaker(url, clip, cropFrac, onProgress) {
   const n = Math.ceil((clip.end - clip.start) / step) + 1;
   for (let i = 0; i < n; i++) {
     const t = Math.min(clip.end, clip.start + i * step);
+    if (signal?.aborted) { v.removeAttribute('src'); v.load(); throw Object.assign(new Error('Cancelled.'), { name: 'AbortError' }); }
     v.currentTime = t;
-    await new Promise((r) => { v.onseeked = r; });
+    await new Promise((r) => { v.onseeked = r; setTimeout(r, 5000); }); // never hang on a stuck seek
     const best = detectFrame();
     if (best) pts.push({ t, x: best.x });
     onProgress?.((i + 1) / n);

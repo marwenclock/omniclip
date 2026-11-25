@@ -13,19 +13,21 @@ Sister project of [OMNIVIEWER](https://github.com/marwenclock/omniviewer3d), the
 
 ## What it does
 
-1. **Drop a video or audio file** (MP4, MOV, WebM, MP3, WAV…).
-2. **Transcribes it** on your graphics card (WebGPU). Choose *Fast*, *Better* or *Best*.
-3. **Finds the best moments** for shorts: strong opening hooks that make sense on their own.
-   - *Smart* (default): transcript signals pick the moments, an on-device AI rates them and writes titles.
-   - *Deep*: a stronger on-device AI for computers with a fast graphics card.
-   - *Instant*: no AI download at all, works on any computer.
-4. **Exports vertical 9:16 MP4s** (1080×1920 or 720×1280):
-   - crop that **follows the speaker's face**, a fixed crop, or the full frame on a blurred background;
-   - **burned-in captions**, word by word or classic subtitles;
-   - an optional **title card**;
-   - audio-only files become an **audiogram** (title, level bars, captions).
+Two ways in, one editor:
 
-Also: edit the transcript to fix misheard words (captions use your fix), make your own short from selected lines, nudge clip start/end, download subtitles (`.srt`), and reopen a file without transcribing it again.
+- **Create shorts** — drop a long video or podcast. OMNICLIP transcribes it on your graphics card (WebGPU) and finds the strongest moments: *Smart* (an on-device AI rates them and writes titles), *Deep* (a stronger model for fast GPUs) or *Instant* (no AI download).
+- **Edit a video** — opens the file straight away as one clip to cut by hand. No transcription, nothing to download. Add captions later with *Transcribe it* or by importing an `.srt`/`.vtt`.
+
+The editor:
+
+- **Output monitor** that draws every frame with the same code as the export, so what you preview is what you get. Switch to **Source** to see the whole video, set In/Out and make new clips.
+- **Timeline** with ruler, waveform, caption blocks and draggable trim handles. Split at the playhead, delete or reorder ranges, cut long pauses automatically, change speed.
+- **Per-clip styling**: caption presets (or your own), font, weight, case, colours, edge, size, position, words at a time, right-to-left text; shapes 9:16, 4:5, 1:1, 16:9 or original; follow-the-speaker, fixed, blurred or fitted framing; rotate and mirror; an image or video overlay; volume and fades. *Apply to all* with undo.
+- **Projects saved on your device** with undo/redo; reopen them from the start page (choose the video again) or save a small project file.
+- **Export queue** with progress, cancel, retry and *Download all (.zip)*. Exports are 1080p or 720p MP4 (WebM where MP4 isn't available). A *background-safe* export (beta) renders frame by frame with WebCodecs.
+- Edit the transcript (captions use your fix), search it, make a short from selected lines, download full or per-clip subtitles (`.srt`).
+- Audio-only files become an **audiogram** (title, level bars, captions).
+- Free and ad-free, no account, no watermark. A *Support* entry in About will take donations once they're set up (`config.js`).
 
 ## Privacy
 
@@ -55,10 +57,16 @@ To make test audio on Windows: `powershell -File test/make-test-audio.ps1` (uses
 
 | File | Role |
 | --- | --- |
-| `app.js` | Page logic, pipeline, transcript, export queue |
+| `app.js` | Start page, the two entry flows, transcription and picking pipeline, saved projects |
+| `editor.js` | Editor: clip bin, monitor, inspector, timeline wiring, transcript, export queue |
+| `project.js` | Project model (clips as ranges, per-clip styles), undo/redo, autosave, project files |
+| `render.js` | The compositor shared by the Output monitor and the export (framing, captions, title, overlay) |
+| `timeline.js` | Timeline canvas |
+| `tools.js` | Subtitles (SRT/VTT), ZIP writer, audio peaks and pause detection |
+| `fastexport.js` | Background-safe export (beta, WebCodecs + mp4-muxer) |
 | `asr-worker.js` | Whisper speech-to-text in a Web Worker (transformers.js, WebGPU) |
 | `clips.js` | Instant moment picker (text signals) and the local AI rater (WebLLM) |
-| `export.js` | 9:16 rendering, captions, title card, audiogram, MP4 recording |
+| `export.js` | Real-time export: plays each range and records the compositor's frames with MediaRecorder |
 | `reframe.js` | Face tracking for the follow-the-speaker crop (MediaPipe) |
 | `decode-stream.js` | Streamed audio decoding for large MP4/MOV files (mp4box.js + WebCodecs) |
 
@@ -68,6 +76,7 @@ To make test audio on Windows: `powershell -File test/make-test-audio.ps1` (uses
 - Clip rating: [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) (Apache-2.0) and [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) (MIT) via [WebLLM](https://github.com/mlc-ai/web-llm) (Apache-2.0)
 - Face detection: [MediaPipe](https://github.com/google-ai-edge/mediapipe) BlazeFace (Apache-2.0)
 - MP4 parsing: [mp4box.js](https://github.com/gpac/mp4box.js) (BSD-3-Clause)
+- MP4 writing (beta export): [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT)
 
 Models are downloaded by the visitor's browser from their public hosts; they are not redistributed here.
 

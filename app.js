@@ -1,39 +1,40 @@
+// OMNICLIP app shell: the start screen, the two ways in (Create shorts / Edit a
+// video), the on-device pipeline (decode -> transcribe -> pick moments), saved
+// projects and relinking, the sample, and the About / Storage dialogs.
 import { decodeAudioStream, canStreamDecode } from './decode-stream.js';
-import { exportClip, exportExt, exportMime, clipWords } from './export.js';
-import { pickModel, loadLLM, instantClips, rateClip, rank, fmt } from './clips.js';
+import { CONFIG } from './config.js';
+import { pickModel, loadLLM, instantClips, rateClip, rank } from './clips.js';
+import { exportMime } from './export.js';
+import { peaks } from './tools.js';
+import {
+  P, load, quiet, newProject, makeSource, makeClip, transcriptKey, dbGet, dbPut, dbDel, dbAll, parseProjectFile, projectFile, sourceById,
+} from './project.js';
+import { R, openEditor, selectClip, appendSegments, showEmpty, announce, setStatus, notice, ask, saveFile, safeName, fmt, mb, showBinTab, showInspTab } from './editor.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { segments: [], clips: [], mine: [], sel: null, file: null, url: null, stopAt: null, thumbs: new Map(), pos: 0.5 };
-let nextId = 1;
+const qsa = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- settings (named by what they do; the models behind them stay an implementation detail) ----------
-const QUALITY = {
-  fast: 'onnx-community/whisper-base',
-  better: 'onnx-community/whisper-small',
-  best: 'onnx-community/whisper-large-v3-turbo',
-};
+const QUALITY = { fast: 'onnx-community/whisper-base', better: 'onnx-community/whisper-small', best: 'onnx-community/whisper-large-v3-turbo' };
 const FINDER = {
   smart: { model: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', shortlist: 1.5 },
   deep: { model: 'Phi-3.5-mini-instruct-q4f16_1-MLC', shortlist: 2 },
   instant: null,
 };
 const FINDER_HELP = {
-  smart: 'Smart: an on-device AI rates each moment and writes titles (about 1 GB, downloaded once).',
-  deep: 'Deep: a stronger on-device AI for fast graphics cards (about 2.2 GB, downloaded once).',
-  instant: 'Instant: picks moments from the transcript alone, with nothing extra to download.',
+  smart: 'Smart: an on-device AI rates each moment and writes titles (about 1 GB, downloaded once)',
+  deep: 'Deep: a stronger on-device AI for fast graphics cards (about 2.2 GB, downloaded once)',
+  instant: 'Instant: picks moments from the transcript alone, with nothing extra to download',
 };
-const QUALITY_HELP = {
-  fast: 'Fast transcription: 200 MB.',
-  better: 'Better transcription: 600 MB.',
-  best: 'Best transcription: 1.6 GB, for fast graphics cards.',
-};
-const radio = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value;
+const QUALITY_HELP = { fast: 'Fast transcription: 200 MB.', better: 'Better transcription: 600 MB.', best: 'Best transcription: 1.6 GB, for fast graphics cards.' };
+const LANGS = { en: 'English', es: 'Spanish', fr: 'French', de: 'German', pt: 'Portuguese', it: 'Italian', ar: 'Arabic' };
 const finder = () => $('finder').value || 'smart';
 const asrModel = () => QUALITY[$('quality').value] || QUALITY.fast;
-
-// Remember the visitor's choices on this device.
 const OPT_KEY = 'omniclip:options';
-const STYLE_KEY = 'omniclip:style';
+let hasGPU = false, gpuChecked = false;
+const gpu = { weak: false, name: '' };
+
 function saveOptions() {
   localStorage.setItem(OPT_KEY, JSON.stringify({ finder: finder(), quality: $('quality').value, lang: $('lang').value, count: $('count').value }));
   explainOptions();
@@ -42,74 +43,172 @@ function loadOptions() {
   try {
     const o = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
     for (const k of ['finder', 'quality', 'lang', 'count']) if (o[k] && [...$(k).options].some((x) => x.value === String(o[k]))) $(k).value = o[k];
-    const s = JSON.parse(localStorage.getItem(STYLE_KEY) || '{}');
-    for (const k of ['layout', 'caps', 'title', 'size']) if (s[k]) { const r = document.querySelector(`input[name="${k}"][value="${s[k]}"]`); if (r) r.checked = true; }
-    if (typeof s.pos === 'number') state.pos = s.pos;
   } catch { /* first visit */ }
   explainOptions();
 }
-const saveStyle = () => localStorage.setItem(STYLE_KEY, JSON.stringify({ layout: radio('layout'), caps: radio('caps'), title: radio('title'), size: radio('size'), pos: state.pos }));
 function explainOptions() {
   const n = $('count').value;
-  const countHelp = n === 'auto'
-    ? 'Auto shorts: about one per 2 minutes of video.'
-    : +n >= 8 ? `${n} shorts suits videos longer than about ${n * 2} minutes.` : '';
-  $('optHelp').textContent = `${FINDER_HELP[finder()]} ${QUALITY_HELP[$('quality').value]} ${countHelp}`;
-  // Steer people away from settings their computer can't run well.
+  const countHelp = n === 'auto' ? 'Auto shorts: about one per 2 minutes of video.' : +n >= 8 ? `${n} shorts suits videos longer than about ${n * 2} minutes.` : '';
+  const eff = gpuChecked && !hasGPU ? 'instant' : finder();
+  const deviceNote = gpuChecked && !hasGPU ? ' (this browser can’t use the graphics card, so Smart and Deep aren’t available here)' : '';
+  const langNote = $('lang').value !== 'en' ? ' Moment picking is tuned for English, so check the picks or choose lines yourself.' : '';
+  $('optHelp').textContent = `${FINDER_HELP[eff]}${deviceNote}. ${QUALITY_HELP[$('quality').value]} ${countHelp}${langNote}`;
+  $('settingsSum').textContent = `· ${n === 'auto' ? 'Auto count' : `${n} shorts`} · ${LANGS[$('lang').value]} · ${eff[0].toUpperCase() + eff.slice(1)} picking · ${$('quality').selectedOptions[0].text} accuracy`;
   let warn = null;
   if (gpu.weak && finder() === 'deep') warn = { text: `Your computer has ${gpu.name}, so Deep picking will be very slow.`, fix: 'Use Smart', apply: () => { $('finder').value = 'smart'; } };
   else if (gpu.weak && $('quality').value === 'best') warn = { text: `Your computer has ${gpu.name}, so Best accuracy will be very slow.`, fix: 'Use Better', apply: () => { $('quality').value = 'better'; } };
-  else if (!hasGPU && gpuChecked && finder() !== 'instant') warn = { text: 'Without graphics card access, moments are picked from the transcript (Instant).', fix: 'OK', apply: () => { $('finder').value = 'instant'; } };
   $('optWarn').hidden = !warn;
   if (warn) {
     $('optWarn').querySelector('span').textContent = warn.text;
     const b = $('optWarn').querySelector('button');
-    b.textContent = warn.fix;
-    b.onclick = () => { warn.apply(); saveOptions(); };
+    b.textContent = warn.fix; b.onclick = () => { warn.apply(); saveOptions(); };
   }
 }
-document.querySelectorAll('#options select').forEach((el) => el.addEventListener('change', saveOptions));
-
-// ---------- capability check (not awaited at top level: the file picker works immediately) ----------
-let hasGPU = false, gpuChecked = false;
-const gpu = { weak: false, name: '' };
+qsa('#options select').forEach((el) => el.addEventListener('change', saveOptions));
 loadOptions();
 const gpuReady = (async () => {
   const adapter = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
-  hasGPU = !!adapter;
-  gpuChecked = true;
+  hasGPU = !!adapter; gpuChecked = true;
   if (adapter) {
     const info = adapter.info || {};
     const id = `${info.vendor || ''} ${info.architecture || ''} ${info.description || ''}`;
-    // Built-in Intel graphics (and cards without half-precision support) run the bigger models very slowly.
     if (/intel/i.test(id)) { gpu.weak = true; gpu.name = 'built-in Intel graphics'; }
     else if (!adapter.features.has('shader-f16')) { gpu.weak = true; gpu.name = 'an older graphics card'; }
   }
   explainOptions();
-  if (!hasGPU) {
-    $('gpuNote').textContent = 'This browser can’t use your graphics card, so transcription will be slow and moments are picked without AI. For the full experience, use a recent Chrome or Edge on a computer.';
-    $('gpuNote').hidden = false;
-  }
+  if (!hasGPU) { $('gpuNote').textContent = 'Transcription will be slower in this browser. For the full experience, use a recent Chrome or Edge on a computer.'; $('gpuNote').hidden = false; }
 })();
+if (!exportMime) { $('exportNote').textContent = 'This browser can’t record video, so you can transcribe, edit and download subtitles here but not export shorts. Use Chrome or Edge on a computer to export.'; $('exportNote').hidden = false; }
 
-// ---------- helpers ----------
-const setStatus = (t) => { $('status').textContent = t; };
-const mb = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : (b / 1e6).toFixed(0) + ' MB');
-const shorts = (n) => `${n} short${n === 1 ? '' : 's'}`;
-const eta = (sec) => (sec < 60 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`);
-const ICON = {
-  down: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  check: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+// ---------- About, support, storage ----------
+const HEART = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16.5s-6-3.6-6-8.1A3.4 3.4 0 0 1 10 6.3a3.4 3.4 0 0 1 6 2.1c0 4.5-6 8.1-6 8.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+$('donateSlot').innerHTML = CONFIG.donateUrl
+  ? `<a class="btn btn-solid" href="${encodeURI(CONFIG.donateUrl)}" target="_blank" rel="noopener">${HEART} ${esc(CONFIG.donateLabel)}</a>`
+  : `<button class="btn btn-solid" type="button" disabled title="Donations are being set up">${HEART} Donations coming soon</button>`;
+$('aboutBtn').onclick = () => $('about').showModal();
+qsa('dialog').forEach((d) => {
+  d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+});
+$('singleKeys').checked = R.singleKeys;
+$('singleKeys').onchange = () => { R.singleKeys = $('singleKeys').checked; localStorage.setItem('omniclip:keys', R.singleKeys ? '1' : '0'); };
+$('storageBtn').onclick = () => { $('about').close(); openStorage(); };
+
+async function openStorage() {
+  const list = $('storeList');
+  list.innerHTML = '<li><div>Checking…</div></li>';
+  $('storage').showModal();
+  const est = await navigator.storage?.estimate?.().catch(() => null);
+  $('storageTotal').textContent = est ? `OMNICLIP uses about ${mb(est.usage || 0)} on this device${est.quota ? ` (the browser allows up to ${mb(est.quota)})` : ''}.` : '';
+  const [projects, transcripts, assets] = await Promise.all([dbAll('projects'), dbAll('transcripts'), dbAll('assets')]);
+  const cacheNames = (await caches?.keys?.().catch(() => [])) || [];
+  const rows = [];
+  for (const { key, value } of projects) rows.push({ label: `Project: ${value.name}`, meta: `${value.clips?.length || 0} clips · edited ${new Date(value.updated).toLocaleString()} · ~${mb(JSON.stringify(value).length)}`, del: () => dbDel('projects', key) });
+  if (transcripts.length) rows.push({ label: `Remembered transcripts (${transcripts.length})`, meta: transcripts.map((t) => String(t.key).split('|')[0]).slice(0, 4).join(', ') + (transcripts.length > 4 ? '…' : ''), del: () => Promise.all(transcripts.map((t) => dbDel('transcripts', t.key))) });
+  if (assets.length) rows.push({ label: `Overlay images and videos (${assets.length})`, meta: mb(assets.reduce((s, a) => s + (a.value?.size || 0), 0)), del: () => Promise.all(assets.map((a) => dbDel('assets', a.key))) });
+  for (const n of cacheNames) rows.push({ label: /transformers/i.test(n) ? 'Speech model (Whisper)' : /webllm|mlc|tvmjs/i.test(n) ? `Moment-picking AI (${n})` : `Downloaded files (${n})`, meta: 'Downloaded once, used offline after that', del: () => caches.delete(n) });
+  list.innerHTML = rows.length ? '' : '<li><div>Nothing stored yet.</div></li>';
+  rows.forEach((r) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div>${esc(r.label)}<span class="meta">${esc(r.meta)}</span></div><button class="btn btn-outline btn-sm" type="button">Delete</button>`;
+    li.querySelector('button').onclick = async () => { await r.del(); li.remove(); renderDrafts(); };
+    list.append(li);
+  });
+}
+
+// ---------- the two ways in ----------
+let mode = 'shorts';
+$('pickShorts').onclick = () => { mode = 'shorts'; $('file').value = ''; $('file').click(); };
+$('pickEdit').onclick = () => { mode = 'edit'; $('file').value = ''; $('file').click(); };
+$('file').addEventListener('change', (e) => e.target.files[0] && startFile(e.target.files[0], mode));
+const veil = $('dropVeil');
+let dragDepth = 0;
+const overZone = (e) => document.elementFromPoint(e.clientX, e.clientY)?.closest('.dz');
+addEventListener('dragenter', (e) => {
+  if (!e.dataTransfer?.types.includes('Files') || document.querySelector('dialog[open]')) return;
+  dragDepth++; veil.hidden = false;
+  veil.classList.toggle('single', !!P.project && !$('work').hidden);
+  veil.querySelector('[data-mode="shorts"]').innerHTML = P.project && !$('work').hidden ? 'Drop to <b>add this video to the project</b>' : 'Drop here to <b>create shorts</b>';
+});
+addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; veil.hidden = true; } });
+addEventListener('dragover', (e) => { e.preventDefault(); qsa('.dz').forEach((z) => z.classList.toggle('over', z === overZone(e))); });
+addEventListener('drop', (e) => {
+  if (e.defaultPrevented && !e.dataTransfer?.files.length) return;
+  e.preventDefault();
+  const zone = veil.hidden ? null : overZone(e)?.dataset.mode; // read before hiding the veil
+  dragDepth = 0; veil.hidden = true;
+  const files = [...(e.dataTransfer?.files || [])].filter((f) => /^(video|audio)\//.test(f.type) || /\.(mp4|mov|m4v|webm|mkv|mp3|wav|m4a|aac|ogg|flac)$/i.test(f.name));
+  if (!files.length) { if (e.dataTransfer?.files.length) announce('That file isn’t a video or audio file.'); return; }
+  if (P.project && !$('work').hidden) { files.forEach(addMedia); return; }
+  const m = zone || 'shorts';
+  startFile(files[0], m);
+  if (files.length > 1) setTimeout(() => { files.slice(1).forEach(addMedia); announce(`Opened ${files[0].name} and added ${files.length - 1} more video${files.length > 2 ? 's' : ''} to the project (Media tab).`); }, 500);
+});
+$('newVideo').onclick = async () => {
+  if (R.jobs.some((j) => ['queued', 'running'].includes(j.state)) && await ask('Leave this project?', '<p>An export is still running. Your project is saved on this device, but the export will stop.</p>', [{ label: 'Stay', value: false, solid: true }, { label: 'Leave', value: true }]) !== true) return;
+  location.href = './';
 };
 
-// ---------- progress: one floating pill that shows the step that matters now ----------
-const STEPS = {
-  stDecode: { label: 'Reading the audio', order: 1 },
-  stAsr: { label: 'Transcribing', order: 2 },
-  stLlm: { label: 'Loading the AI', order: 0 },
-  stPick: { label: 'Rating the moments', order: 3 },
-};
-const progress = {};
+// ---------- media metadata ----------
+function readMeta(url) {
+  return new Promise((res) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata'; v.src = url;
+    const done = () => { res({ duration: Number.isFinite(v.duration) ? v.duration : 0, width: v.videoWidth, height: v.videoHeight }); v.removeAttribute('src'); v.load(); };
+    v.onloadedmetadata = done; v.onerror = () => res(null); setTimeout(() => res(null), 15000);
+  });
+}
+function linkFile(src, file) {
+  if (R.urls[src.id]) URL.revokeObjectURL(R.urls[src.id]);
+  R.urls[src.id] = URL.createObjectURL(file);
+  R.files[src.id] = file;
+}
+
+// ---------- start a new project from a file ----------
+async function startFile(file, how, opts = {}) {
+  const src = makeSource(file);
+  const p = newProject(src);
+  if (how === 'edit') p.defaults.captions = 'none';
+  linkFile(src, file);
+  load(p);
+  openEditor();
+  setStatus(`Opening ${file.name}…`);
+  const meta = await readMeta(R.urls[src.id]);
+  if (!meta) {
+    announce('This file couldn’t be opened. It may be damaged or in a format this browser can’t play. Try an MP4.');
+    showEmpty('This file couldn’t be played in this browser. Try converting it to MP4, or choose another file.');
+    return;
+  }
+  quiet((pp) => { Object.assign(pp.sources[0], meta); });
+  if (meta.height > meta.width * 1.2) quiet((pp) => { pp.defaults.layout = 'crop'; });
+  if (how === 'edit') {
+    // Edit a video: the whole file is one clip, ready to trim. Nothing to download.
+    const c = makeClip({ src: src.id, start: 0, end: meta.duration || 1, name: p.name, title: '' });
+    quiet((pp) => { pp.clips.push(c); });
+    selectClip(c.id, { quiet: true });
+    showInspTab('itTrim');
+    announce(`${file.name} is open. Trim it with the timeline or the Trim panel, then export. Captions need a transcript: Captions → Transcribe it.`);
+    readPeaks(src.id);
+    return;
+  }
+  await runShorts(src.id, opts);
+}
+async function addMedia(file) {
+  if (!P.project) return startFile(file, 'edit');
+  const src = makeSource(file);
+  linkFile(src, file);
+  const meta = await readMeta(R.urls[src.id]);
+  if (!meta) { announce(`${file.name} couldn’t be opened in this browser.`); return; }
+  Object.assign(src, meta);
+  quiet((p) => { p.sources.push(src); p.segments[src.id] = []; }, 'clips');
+  showBinTab('tabMedia');
+  announce(`Added ${file.name}. Make a clip from it, or add it to the selected clip, in the Media tab.`);
+  readPeaks(src.id);
+}
+$('mediaFile').onchange = () => { const f = $('mediaFile').files[0]; if (f) addMedia(f); };
+
+// ---------- progress pill ----------
+const STEPS = { stDecode: { label: 'Reading the audio', order: 1 }, stAsr: { label: 'Transcribing', order: 2 }, stLlm: { label: 'Loading the AI', order: 0 }, stPick: { label: 'Rating the moments', order: 3 } };
+let progress = {};
 function step(id, { active, done, value, info } = {}) {
   const p = (progress[id] ||= { active: false, done: false, value: 0, info: '' });
   if (active) p.active = true;
@@ -129,708 +228,311 @@ function renderProgress() {
   $('ppBar').style.width = `${Math.round(p.value * 100)}%`;
   setStatus(`${STEPS[id].label}${p.info ? ' · ' + p.info : ''}`);
 }
-
-// ---------- file input: the drop card or anywhere on the page ----------
-$('file').addEventListener('change', (e) => e.target.files[0] && start(e.target.files[0]));
-const veil = $('dropVeil');
-let dragDepth = 0;
-addEventListener('dragenter', (e) => { if (state.file || !e.dataTransfer?.types.includes('Files')) return; dragDepth++; veil.hidden = false; });
-addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; veil.hidden = true; } });
-addEventListener('dragover', (e) => e.preventDefault());
-addEventListener('drop', (e) => {
-  e.preventDefault(); dragDepth = 0; veil.hidden = true;
-  const f = e.dataTransfer?.files[0];
-  if (f && !state.file) start(f);
-});
-$('newVideo').onclick = () => {
-  if ((exporting || exportQueue.length) && !confirm('An export is still running. Start over anyway?')) return;
-  state.leaving = true;
-  location.href = './';
+const endProgress = () => { for (const p of Object.values(progress)) p.active = false; renderProgress(); };
+let run = null; // { cancelled, worker }
+$('cancelRun').onclick = () => {
+  if (!run) return;
+  run.cancelled = true; run.worker?.terminate(); run.reject?.(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
+  endProgress();
+  announce('Stopped. Everything transcribed so far is kept; you can cut the video by hand.');
 };
 
-// ---------- how many shorts: recommend by length, warn when the ask is too many ----------
-// About one short per 2 minutes: beyond that the picks overlap or get weak.
-const recommendCount = (sec) => Math.max(1, Math.min(12, Math.ceil(sec / 120)));
-function chooseTarget(duration) {
-  const asked = $('count').value;
-  const rec = recommendCount(duration);
-  if (asked === 'auto') { state.target = rec; return; }
-  state.target = +asked;
-  if (+asked > Math.max(rec * 1.5, rec + 2)) {
-    state.target = rec;
-    showNotice(
-      `This video is <b>${fmt(duration)}</b> long. ${asked} shorts from it would mean weak, overlapping moments, so OMNICLIP will make the best <b>${rec}</b>.`,
-      `Make ${asked} anyway`,
-      () => { state.target = +asked; hideNotice(); repick(); },
-    );
-  }
-}
-function showNotice(html, action, onAction) {
-  const n = $('notice');
-  n.querySelector('p').innerHTML = html;
-  const b = n.querySelector('button');
-  b.hidden = !action;
-  b.textContent = action || '';
-  b.onclick = onAction;
-  n.hidden = false;
-}
-const hideNotice = () => { $('notice').hidden = true; };
-// Re-run the picking with a new count once the transcript exists (ratings are remembered).
-async function repick() {
-  if (!state.picked) return; // picking hasn't started yet: it will use the new count
-  if (state.picking) { state.repickAfter = true; return; }
-  if (state.mode === 'instant') pickInstant();
-  else await pickSmart(state.target, FINDER[state.mode].shortlist);
-}
-const metadata = () => new Promise((res) => {
-  const v = $('player');
-  if (v.readyState >= 1) return res();
-  v.addEventListener('loadedmetadata', res, { once: true });
-  v.addEventListener('error', res, { once: true });
-  setTimeout(res, 8000);
-});
-
-// ---------- side tabs ----------
-function showTab(id) {
-  document.querySelectorAll('.side-tab').forEach((t) => {
-    const on = t.dataset.tab === id;
-    t.classList.toggle('active', on);
-    t.setAttribute('aria-selected', on);
-    $(t.dataset.tab).hidden = !on;
-  });
-}
-document.querySelectorAll('.side-tab').forEach((t) => (t.onclick = () => showTab(t.dataset.tab)));
-
-// ---------- pipeline ----------
-async function start(file) {
-  state.file = file;
-  document.body.classList.add('working');
-  $('setup').hidden = true;
-  $('work').hidden = false;
-  $('topFile').hidden = false;
-  $('newVideo').hidden = false;
-  $('fileName').textContent = file.name;
-  $('fileMeta').textContent = mb(file.size);
-  document.title = `${file.name} · OMNICLIP`;
-  state.url = URL.createObjectURL(file);
-  $('player').src = state.url;
-  $('player').addEventListener('loadedmetadata', () => {
-    $('fileMeta').textContent = `${fmt($('player').duration)} · ${mb(file.size)}`;
-    const v = $('player');
-    const audioOnly = !v.videoWidth;
-    state.vertical = !audioOnly && v.videoHeight >= v.videoWidth * 1.2;
-    $('stage').classList.toggle('audio', audioOnly);
-    // Already-vertical footage is used as it is: no framing choice to make.
-    document.querySelector('.dock-group[aria-label="Framing"]').hidden = audioOnly || state.vertical;
-    layoutCrop();
-  }, { once: true });
-  if (!exportMime) $('exNote').textContent = 'This browser can’t record video, so exporting is unavailable here. Use Chrome or Edge on a computer.';
-  const t0 = performance.now();
-  try {
-    await metadata();
-    chooseTarget($('player').duration || 0);
-    if (state.vertical) showNotice('Your video is already vertical, so shorts keep its full frame.', null, null);
-    await gpuReady;
-    const mode = hasGPU ? finder() : 'instant';
-    state.mode = mode;
-    // Load the moment finder while transcription runs, so its download overlaps.
-    const llmReady = mode === 'instant' ? null : loadPicker(FINDER[mode].model);
-    llmReady?.catch(() => {}); // surfaced below
-    const cached = await dbGet(transcriptKey()).catch(() => null);
-    if (cached?.segments?.length) {
-      state.segments = cached.segments;
-      addTranscript(state.segments);
-      $('srt').disabled = false;
-    } else {
-      const audio = await decode(file);
-      await transcribe(audio);
-      saveTranscript();
-    }
-    if (!state.segments.length) throw new Error('No speech was found in this file.');
-    state.picked = true;
-    if (mode === 'instant') pickInstant();
-    else { await llmReady; await pickSmart(state.target, FINDER[mode].shortlist); }
-    setStatus(`Done in ${eta((performance.now() - t0) / 1000)} · ${shorts(allClips().length)} ready to export${state.aiFailed ? ' · the on-device AI stopped responding, so moments were picked from the transcript' : ''}`);
-  } catch (err) {
-    console.error(err);
-    for (const p of Object.values(progress)) p.active = false;
-    renderProgress();
-    const msg = 'Something went wrong: ' + (err.message || err);
-    setStatus(msg);
-    $('resultsSub').textContent = msg;
-    $('clipsEmpty').classList.add('failed');
-  }
-}
-
-async function decode(file) {
-  step('stDecode', { active: true, info: mb(file.size) });
+// ---------- decode, peaks, transcribe ----------
+const audioCache = {};
+async function decode(srcId, quietly = false) {
+  if (audioCache[srcId]) return audioCache[srcId];
+  const file = R.files[srcId];
   const mp4ish = /mp4|quicktime|m4a|m4v/.test(file.type) || /\.(mp4|mov|m4a|m4v)$/i.test(file.name);
-  const streamed = async () => {
-    const audio = await decodeAudioStream(file, (p) => step('stDecode', { value: p, info: `${mb(file.size * p)} / ${mb(file.size)}` }));
-    step('stDecode', { done: true });
-    return audio;
-  };
-  // Big MP4/MOV files: stream the audio out instead of loading the whole file.
-  if (mp4ish && canStreamDecode() && (file.size > 300e6 || window.__forceStreamDecode)) return streamed();
-  try {
-    return await decodeWhole(file);
-  } catch (err) {
-    if (mp4ish && canStreamDecode()) { console.warn('[omniclip] whole-file decode failed, streaming instead', err); return streamed(); }
-    throw err;
+  const prog = (p) => !quietly && step('stDecode', { value: p, info: `${mb(file.size * p)} / ${mb(file.size)}` });
+  if (!quietly) step('stDecode', { active: true, info: mb(file.size) });
+  let audio;
+  if (mp4ish && canStreamDecode() && file.size > 300e6) audio = await decodeAudioStream(file, prog);
+  else {
+    if (!mp4ish && file.size > 1.2e9) throw new Error('This file is too large to read in the browser. Convert it to MP4 or MOV, or split it.');
+    try {
+      const ctx = new AudioContext({ sampleRate: 16000 });
+      const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+      ctx.close();
+      audio = buf.getChannelData(0);
+      if (buf.numberOfChannels > 1) { const r = buf.getChannelData(1); audio = audio.map((v, i) => (v + r[i]) / 2); }
+    } catch (err) {
+      if (mp4ish && canStreamDecode()) audio = await decodeAudioStream(file, prog);
+      else if (/decod|EncodingError/i.test(err.name + err.message)) throw new Error('This file has no audio track the browser can read.');
+      else throw err;
+    }
   }
+  if (!quietly) step('stDecode', { done: true });
+  R.peaks[srcId] = peaks(audio, 16000);
+  if (file.size < 400e6) audioCache[srcId] = audio; // small files: keep for a later transcription
+  return audio;
 }
-
-async function decodeWhole(file) {
-  const ctx = new AudioContext({ sampleRate: 16000 });
-  const buf = await ctx.decodeAudioData(await file.arrayBuffer());
-  ctx.close();
-  let mono = buf.getChannelData(0);
-  if (buf.numberOfChannels > 1) {
-    const r = buf.getChannelData(1);
-    mono = mono.map((v, i) => (v + r[i]) / 2);
-  }
-  step('stDecode', { done: true });
-  return mono;
+const peakJobs = new Set();
+R.hooks.peaksPending = () => peakJobs.size > 0;
+async function readPeaks(srcId) {
+  if (R.peaks[srcId] || peakJobs.has(srcId)) return;
+  peakJobs.add(srcId);
+  try { await decode(srcId, true); quiet(() => {}, 'peaks'); } catch (e) { console.warn('[omniclip] no waveform', e); }
+  peakJobs.delete(srcId);
 }
-
-function transcribe(audio) {
+function transcribe(srcId, audio) {
   return new Promise((resolve, reject) => {
     step('stAsr', { active: true, value: 0, info: 'starting…' });
     const worker = new Worker('./asr-worker.js', { type: 'module' });
+    run.worker = worker; run.reject = reject;
     const dl = {};
+    const fail = (text) => { worker.terminate(); reject(new Error(text)); };
+    worker.onerror = (e) => { e.preventDefault?.(); fail('The speech engine could not load. Check your connection and try again.'); };
+    worker.onmessageerror = () => fail('The speech engine sent an unreadable message.');
     worker.onmessage = ({ data: m }) => {
       if (m.type === 'download') {
         dl[m.file] = m;
-        const loaded = Object.values(dl).reduce((s, d) => s + d.loaded, 0);
-        const total = Object.values(dl).reduce((s, d) => s + d.total, 0);
+        const loaded = Object.values(dl).reduce((s, d) => s + d.loaded, 0), total = Object.values(dl).reduce((s, d) => s + d.total, 0);
         step('stAsr', { value: loaded / total, info: `loading ${mb(loaded)} / ${mb(total)}` });
       } else if (m.type === 'segments') {
-        state.segments.push(...m.segments);
-        addTranscript(m.segments);
+        quiet((p) => { (p.segments[srcId] ||= []).push(...m.segments); }, 'stream');
+        const all = P.project.segments[srcId];
+        appendSegments(srcId, all.slice(all.length - m.segments.length));
         const left = (m.elapsed / m.done) * (m.total - m.done);
         step('stAsr', { value: m.done / m.total, info: `${fmt(m.done)} / ${fmt(m.total)} · ${eta(left)} left` });
-      } else if (m.type === 'finished') {
-        step('stAsr', { done: true });
-        $('srt').disabled = false;
-        worker.terminate();
-        resolve();
-      } else if (m.type === 'error') {
-        worker.terminate();
-        reject(new Error(m.text));
-      }
+      } else if (m.type === 'finished') { step('stAsr', { done: true }); worker.terminate(); resolve(); }
+      else if (m.type === 'error') fail(m.text);
     };
+    delete audioCache[srcId]; // the worker takes the samples; peaks are already computed
     worker.postMessage({ audio, model: asrModel(), language: $('lang').value, device: hasGPU ? 'webgpu' : 'wasm' }, [audio.buffer]);
   });
 }
+const eta = (sec) => (sec < 60 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`);
 
+// Transcribe (and remember) one source; used by Create shorts and by "Transcribe it" in the editor.
+async function getTranscript(srcId) {
+  const src = sourceById(srcId);
+  const key = transcriptKey(src, asrModel(), $('lang').value);
+  const cached = await dbGet('transcripts', key).catch(() => null);
+  if (cached?.segments?.length) { quiet((p) => { p.segments[srcId] = cached.segments; }, 'segments'); readPeaks(srcId); return; }
+  quiet((p) => { p.segments[srcId] = []; }, 'segments');
+  const audio = await decode(srcId);
+  await transcribe(srcId, audio);
+  dbPut('transcripts', key, { segments: P.project.segments[srcId], saved: Date.now() }).catch(() => {});
+}
+R.hooks.transcribe = async (srcId) => {
+  if (!srcId || run) return;
+  run = { cancelled: false };
+  R.transcribing = true;
+  const t0 = performance.now();
+  try {
+    await gpuReady;
+    await getTranscript(srcId);
+    endProgress();
+    quiet((p) => { if (p.defaults.captions === 'none') p.defaults.captions = 'pop'; }, 'segments');
+    announce(`Transcribed in ${eta((performance.now() - t0) / 1000)}. Captions are on; style them in the Captions panel.`);
+  } catch (e) {
+    endProgress();
+    if (e.name !== 'AbortError') announce(`Transcription failed: ${e.message}`);
+  }
+  R.transcribing = false; run = null;
+  quiet(() => {}, 'segments');
+};
+
+// ---------- Create shorts: transcribe, then pick moments ----------
+const recommendCount = (sec) => Math.max(1, Math.min(12, Math.ceil(sec / 120)));
+async function runShorts(srcId, { segments } = {}) {
+  run = { cancelled: false };
+  progress = {};
+  const t0 = performance.now();
+  const src = sourceById(srcId);
+  const asked = $('count').value, rec = recommendCount(src.duration || 0);
+  let target = asked === 'auto' ? rec : +asked;
+  if (asked !== 'auto' && +asked > Math.max(rec * 1.5, rec + 2)) {
+    target = rec;
+    notice(`This video is <b>${fmt(src.duration)}</b> long. You asked for ${asked} shorts; that many would be weak and overlapping, so OMNICLIP will make the best <b>${rec}</b>.`, `Make ${asked} anyway`, () => repick(srcId, +asked));
+  }
+  try {
+    await gpuReady;
+    const mode = hasGPU ? finder() : 'instant';
+    const llmReady = mode === 'instant' ? null : loadPicker(FINDER[mode].model);
+    llmReady?.catch(() => {}); // handled below
+    if (segments) { quiet((p) => { p.segments[srcId] = segments; }, 'segments'); readPeaks(srcId); }
+    else await getTranscript(srcId);
+    if (run.cancelled) return;
+    if (!P.project.segments[srcId]?.length) {
+      endProgress();
+      showEmpty('No speech was found, so there is nothing to pick from. Use the whole video, or make a clip at the playhead.');
+      announce('No speech found · cut this video by hand');
+      return;
+    }
+    let useAI = mode !== 'instant', aiFailed = false;
+    if (useAI) { try { await llmReady; } catch (e) { console.warn('[omniclip] AI picker unavailable', e); step('stLlm', { done: true }); useAI = false; aiFailed = true; } }
+    if (run.cancelled) return;
+    const n = useAI ? await pickSmart(srcId, target, FINDER[mode].shortlist) : pickInstant(srcId, target);
+    endProgress();
+    const made = P.project.clips.length;
+    if (!made) showEmpty('No clear moments stood out. Use the whole video, or pick transcript lines to make your own short.');
+    else if (n < target) notice(`You asked for ${asked === 'auto' ? `about ${target}` : target}; only <b>${n}</b> strong ${n === 1 ? 'moment stands' : 'moments stand'} out. Pick transcript lines to make more.`, 'Open transcript', () => showBinTab('tabTranscript'));
+    announce(`Done in ${eta((performance.now() - t0) / 1000)} · ${made} short${made === 1 ? '' : 's'} ready${aiFailed ? ' · the on-device AI couldn’t run, so moments were picked from the transcript' : ''}`);
+  } catch (err) {
+    endProgress();
+    if (err.name === 'AbortError') return;
+    console.error(err);
+    announce('Something went wrong: ' + (err.message || err));
+    showEmpty(`Something went wrong: ${err.message || err}. Whatever was transcribed is kept in the Transcript tab, and you can still cut the video by hand.`);
+  } finally { run = null; }
+}
 async function loadPicker(preferred) {
   step('stLlm', { active: true, info: 'starting…' });
   const model = await pickModel(preferred);
-  await loadLLM(model, (p, text) => {
-    const m = text.match(/(\d+)MB/);
-    step('stLlm', { value: p, info: m ? `loading ${m[1]} MB` : Math.round(p * 100) + '%' });
-  });
+  await loadLLM(model, (p, text) => { const m = text.match(/(\d+)MB/); step('stLlm', { value: p, info: m ? `loading ${m[1]} MB` : Math.round(p * 100) + '%' }); });
   step('stLlm', { done: true });
 }
-
-const allClips = () => [...state.mine, ...state.clips];
-const tag = (list) => { for (const c of list) c.id ||= nextId++; return list; };
-
-// Smart: transcript signals set the cuts and show at once; the on-device AI then
-// rates and titles each one, and the list re-sorts as its verdicts come in.
-const rated = new Map(); // "start-end" -> { score, title }, so a re-pick doesn't ask the AI again
-const keyOf = (c) => `${c.start.toFixed(2)}-${c.end.toFixed(2)}`;
-async function pickSmart(n, factor) {
-  state.picking = true;
-  const shortlist = tag(instantClips(state.segments, Math.ceil(n * factor)));
-  state.clips = shortlist.slice(0, n);
-  showClips();
+const toClip = (srcId) => (c) => makeClip({ src: srcId, start: c.start, end: c.end, title: c.title, name: c.title, score: c.score, hook: c.hook, origin: 'auto' });
+function setAutoClips(srcId, list) {
+  quiet((p) => {
+    // keep clips the creator made or changed; replace untouched automatic picks
+    const keep = p.clips.filter((c) => c.origin !== 'auto' || c.titleEdited || Object.keys(c.style).length);
+    p.clips = [...keep, ...list.map(toClip(srcId))];
+  }, 'clips');
+}
+function pickInstant(srcId, n) {
+  const list = instantClips(P.project.segments[srcId], n);
+  setAutoClips(srcId, list);
+  selectClip(P.project.clips[0]?.id || null, { quiet: true });
+  return list.length;
+}
+const rated = new Map();
+async function pickSmart(srcId, n, factor) {
+  const shortlist = instantClips(P.project.segments[srcId], Math.ceil(n * factor));
+  setAutoClips(srcId, shortlist.slice(0, n));
+  selectClip(P.project.clips[0]?.id || null, { quiet: true });
   step('stPick', { active: true, value: 0, info: `0 / ${shortlist.length}` });
   const t0 = performance.now();
   let failures = 0;
-  for (let i = 0; i < shortlist.length; i++) {
-    const c = shortlist[i];
+  for (let i = 0; i < shortlist.length && !run?.cancelled; i++) {
+    const c = shortlist[i], key = `${c.start.toFixed(2)}-${c.end.toFixed(2)}`;
     try {
-      const r = rated.get(keyOf(c)) || (state.aiFailed ? null : await rateClip({ ...c }));
-      if (r) {
-        rated.set(keyOf(c), { score: r.score, title: r.title });
-        c.score = r.score;
-        if (!c._titleEdited) c.title = r.title;
-      }
-    } catch (e) {
-      console.warn(e);
-      // The graphics card gave up (common on weak GPUs): keep the transcript picks instead of failing every clip.
-      if (++failures >= 2) { state.aiFailed = true; break; }
-    }
+      const r = rated.get(key) || await rateClip({ ...c });
+      if (r) { rated.set(key, r); c.score = r.score; c.title = r.title; c.hook = r.hook; }
+    } catch (e) { console.warn(e); if (++failures >= 2) break; }
     const el = (performance.now() - t0) / 1000;
     step('stPick', { value: (i + 1) / shortlist.length, info: `${i + 1} / ${shortlist.length} · ${eta((el / (i + 1)) * (shortlist.length - i - 1))} left` });
-    state.clips = rank(shortlist, n);
-    showClips();
   }
   step('stPick', { done: true });
-  state.picking = false;
-  finishResults();
-  if (state.repickAfter) { state.repickAfter = false; repick(); }
+  const best = rank(shortlist, n);
+  const sel = R.selId;
+  setAutoClips(srcId, best);
+  selectClip(P.project.clips.find((c) => c.id === sel)?.id || P.project.clips[0]?.id || null, { quiet: true });
+  return best.length;
+}
+function repick(srcId, n) {
+  setAutoClips(srcId, instantClips(P.project.segments[srcId], n));
+  selectClip(P.project.clips[0]?.id || null, { quiet: true });
 }
 
-function pickInstant() {
-  state.clips = tag(instantClips(state.segments, state.target));
-  finishResults();
-}
-
-function finishResults() {
-  showClips();
-  const found = state.clips.length;
-  if (found && found < state.target && $('notice').hidden) {
-    showNotice(`Only <b>${found}</b> strong ${found === 1 ? 'moment stands' : 'moments stand'} out in this video, so you get ${shorts(found)} instead of ${state.target}. Select lines in the transcript to make more.`, 'Open transcript', () => showTab('transcriptPane'));
-  }
-  if (!allClips().length) {
-    $('resultsSub').textContent = 'No clear moments found. Open the transcript, select some lines and make your own short.';
-    $('clipsEmpty').classList.add('failed');
-  }
-}
-
-// ---------- clip list ----------
-function showClips() {
-  const list = allClips();
-  $('clipCount').textContent = list.length || '';
-  $('clipsEmpty').hidden = list.length > 0;
-  $('json').disabled = !list.length;
-  $('exAll').disabled = !list.length || !exportMime;
-  $('exAllLabel').textContent = list.length > 1 ? `Export all ${list.length} shorts` : 'Export all';
-  $('clips').innerHTML = '';
-  list.forEach((c, i) => {
-    const el = document.createElement('article');
-    el.className = 'clip';
-    el.tabIndex = 0;
-    el.innerHTML = `
-      <div class="thumb"><span class="dur"></span></div>
-      <div class="clip-body"><h3></h3><div class="meta"></div></div>
-      <div class="clip-state"></div>`;
-    el.onclick = (e) => { if (!e.target.closest('.clip-state')) select(c); };
-    el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(c, true); } };
-    c._el = el;
-    renderClipText(c, i);
-    renderExportState(c);
-    setThumb(c, el);
-    $('clips').append(el);
-  });
-  if (!state.sel || !list.includes(state.sel)) {
-    const keep = state.sel && list.find((c) => c.id === state.sel.id);
-    if (keep || list[0]) select(keep || list[0], false, true);
-    else $('selected').hidden = true;
-  } else {
-    state.sel._el.classList.add('selected');
-    renderSelected();
-  }
-}
-
-function renderClipText(c, i = allClips().indexOf(c)) {
-  const el = c._el;
-  if (!el) return;
-  el.querySelector('h3').textContent = c.title;
-  const score = typeof c.score === 'number' ? `<b>${c.score}/10</b> · ` : '<b>Your pick</b> · ';
-  el.querySelector('.meta').innerHTML = `${score}${fmt(c.start)} · ${Math.round(c.end - c.start)}s`;
-  el.querySelector('.dur').textContent = `${Math.round(c.end - c.start)}s`;
-  el.setAttribute('aria-label', `Short ${i + 1}: ${c.title}`);
-}
-
-// ---------- the selected short ----------
-function select(c, play = false, quiet = false) {
-  state.sel = c;
-  document.querySelectorAll('.clip.selected').forEach((x) => x.classList.remove('selected'));
-  c._el?.classList.add('selected');
-  $('selected').hidden = false;
-  renderSelected();
-  const v = $('player');
-  if (!quiet || v.paused) {
-    if (play) playClip(c);
-    else if (!quiet || v.currentTime === 0) { state.stopAt = null; v.pause(); v.currentTime = c.start + 0.05; }
-  }
-  highlightTranscript(c, !quiet);
-}
-
-function renderSelected() {
-  const c = state.sel;
-  if (!c) return;
-  if (document.activeElement !== $('selTitle')) $('selTitle').value = c.title;
-  $('selTime').textContent = `${fmt(c.start)} – ${fmt(c.end)} · ${Math.round(c.end - c.start)}s${typeof c.score === 'number' ? ` · scored ${c.score}/10` : ''}`;
-  const busy = c._progress != null, queued = exportQueue.includes(c) && !busy;
-  const btn = $('selExport');
-  btn.disabled = busy || queued || !exportMime;
-  btn.innerHTML = busy ? 'Exporting…' : queued ? 'Queued' : c._blobUrl ? `${ICON.check} Saved · export again` : `${ICON.down} Export`;
-  $('selProgress').hidden = !busy;
-  if (busy) {
-    $('selProgress').querySelector('i').style.width = `${Math.round(c._progress * 100)}%`;
-    $('selProgress').querySelector('.lbl').textContent = `${c._label || 'Exporting'} ${Math.round(c._progress * 100)}%`;
-  }
-}
-
-$('selTitle').oninput = () => {
-  const c = state.sel;
-  if (!c) return;
-  c.title = $('selTitle').value;
-  c._titleEdited = true;
-  c._blobUrl = null;
-  renderClipText(c);
-  renderExportState(c);
+// ---------- sample ----------
+$('trySample').onclick = async () => {
+  $('trySample').disabled = true; $('trySample').textContent = 'Loading the sample…';
+  try {
+    const [audio, segs] = await Promise.all([fetch('sample/podcast.m4a').then((r) => { if (!r.ok) throw new Error('sample missing'); return r.blob(); }), fetch('sample/podcast.json').then((r) => r.json())]);
+    const file = new File([audio], 'Sample podcast.m4a', { type: 'audio/mp4', lastModified: 1764000000000 });
+    $('finder').value = 'instant';
+    await startFile(file, 'shorts', { segments: segs });
+    loadOptions();
+  } catch (e) { announce(`The sample couldn’t load: ${e.message}`); $('trySample').disabled = false; $('trySample').textContent = 'Try a sample podcast'; }
 };
-$('selTitle').onkeydown = (e) => { if (e.key === 'Enter') $('selTitle').blur(); };
-$('selPlay').onclick = () => state.sel && playClip(state.sel);
-$('selExport').onclick = () => state.sel && queueExport(state.sel);
-document.querySelectorAll('.selected .nudge button').forEach((b) => {
-  b.onclick = () => {
-    const c = state.sel;
-    if (!c) return;
-    const d = +b.dataset.d;
-    if (b.dataset.k === 'start') c.start = Math.max(0, Math.min(c.end - 5, c.start + d));
-    else c.end = Math.max(c.start + 5, Math.min($('player').duration || Infinity, c.end + d));
-    c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' ');
-    c._blobUrl = null;
-    renderClipText(c);
-    renderExportState(c);
-    renderSelected();
-    highlightTranscript(c, false);
-    if (b.dataset.k === 'start') { setThumb(c, c._el); state.stopAt = null; $('player').pause(); $('player').currentTime = c.start + 0.05; }
-    else { $('player').pause(); $('player').currentTime = Math.max(c.start, c.end - 2); }
-  };
-});
 
-function playClip(c) {
-  const v = $('player');
-  state.stopAt = c.end;
-  v.currentTime = c.start;
-  v.play();
-  if (innerWidth <= 900) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-$('player').addEventListener('timeupdate', () => {
-  const v = $('player');
-  if (state.stopAt !== null && v.currentTime >= state.stopAt) { v.pause(); state.stopAt = null; }
-});
-$('player').addEventListener('play', () => $('stage').classList.add('playing'));
-$('player').addEventListener('pause', () => $('stage').classList.remove('playing'));
-
-function highlightTranscript(c, scroll) {
-  let first = null;
-  document.querySelectorAll('#transcript p[data-t]').forEach((p) => {
-    const on = +p.dataset.t >= c.start - 0.01 && +p.dataset.t < c.end;
-    p.classList.toggle('inclip', on);
-    if (on && !first) first = p;
-  });
-  if (scroll && !$('transcriptPane').hidden) first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-// ---------- 9:16 crop preview on the player (drag to choose the framing) ----------
-function layoutCrop() {
-  const v = $('player'), box = $('crop'), layout = radio('layout');
-  if (!v.videoWidth || layout === 'blur' || state.vertical || v.videoWidth / v.videoHeight <= 9 / 16 + 0.01) { box.hidden = true; return; }
-  const W = v.clientWidth, H = v.clientHeight, s = Math.min(W / v.videoWidth, H / v.videoHeight);
-  const cw = v.videoWidth * s, ch = v.videoHeight * s, cx = (W - cw) / 2, cy = (H - ch) / 2;
-  const bw = (ch * 9) / 16;
-  Object.assign(box.style, { left: `${cx + (cw - bw) * state.pos}px`, top: `${cy}px`, width: `${bw}px`, height: `${ch}px` });
-  box.hidden = false;
-  box.classList.toggle('auto', layout === 'auto');
-  $('cropLabel').textContent = layout === 'auto' ? 'Follows the speaker' : 'Drag to frame';
-  box._range = cw - bw;
-}
-new ResizeObserver(layoutCrop).observe($('stage'));
-(() => {
-  const h = $('cropHandle');
-  let x0 = 0, p0 = 0, dragging = false;
-  h.addEventListener('pointerdown', (e) => {
-    if (radio('layout') !== 'crop') return;
-    dragging = true; x0 = e.clientX; p0 = state.pos; h.setPointerCapture(e.pointerId);
-  });
-  h.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const range = $('crop')._range || 1;
-    state.pos = Math.max(0, Math.min(1, p0 + (e.clientX - x0) / range));
-    layoutCrop();
-  });
-  const end = () => {
-    if (!dragging) return;
-    dragging = false;
-    saveStyle();
-    refreshThumbs();
-  };
-  h.addEventListener('pointerup', end);
-  h.addEventListener('pointercancel', end);
-  h.addEventListener('keydown', (e) => {
-    if (radio('layout') !== 'crop' || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    e.preventDefault();
-    state.pos = Math.max(0, Math.min(1, state.pos + (e.key === 'ArrowLeft' ? -0.05 : 0.05)));
-    layoutCrop(); saveStyle(); refreshThumbs();
-  });
-})();
-function refreshThumbs() {
-  state.thumbs.clear();
-  allClips().forEach((c) => c._el && setThumb(c, c._el));
-  allClips().forEach((c) => { c._blobUrl = null; renderExportState(c); });
-  renderSelected();
-}
-
-// Export style changes: the crop preview follows, and earlier exports no longer match.
-document.querySelectorAll('.dock input').forEach((r) => r.addEventListener('change', () => {
-  saveStyle();
-  layoutCrop();
-  allClips().forEach((c) => { c._blobUrl = null; renderExportState(c); });
-  renderSelected();
-}));
-
-// 9:16 preview frame for each clip, grabbed from the source (sequentially, cached).
-let thumbVideo = null;
-let thumbChain = Promise.resolve();
-function setThumb(c, el) {
-  const key = c.start.toFixed(2);
-  const thumb = el.querySelector('.thumb');
-  const put = (src) => {
-    const target = c._el?.querySelector('.thumb') || thumb;
-    target.querySelector('img, .wave')?.remove();
-    if (src === 'audio') {
-      const w = document.createElement('span');
-      w.className = 'wave';
-      let seed = Math.floor(c.start * 97) || 7;
-      for (let k = 0; k < 7; k++) { seed = (seed * 9301 + 49297) % 233280; const i = document.createElement('i'); i.style.height = `${14 + (seed / 233280) * 40}%`; w.append(i); }
-      target.prepend(w);
-    } else {
-      const img = document.createElement('img');
-      img.alt = ''; img.src = src;
-      target.prepend(img);
-    }
-  };
-  if (state.thumbs.has(key)) { put(state.thumbs.get(key)); return; }
-  thumbChain = thumbChain.then(async () => {
-    if (state.thumbs.has(key)) { put(state.thumbs.get(key)); return; }
-    try {
-      if (!thumbVideo) {
-        thumbVideo = document.createElement('video');
-        thumbVideo.muted = true; thumbVideo.preload = 'auto'; thumbVideo.src = state.url;
-        await new Promise((r, j) => { thumbVideo.onloadeddata = r; thumbVideo.onerror = j; setTimeout(r, 8000); });
-      }
-      const v = thumbVideo;
-      if (!v.videoWidth) { state.thumbs.set(key, 'audio'); put('audio'); return; }
-      v.currentTime = Math.min((v.duration || c.start + 1) - 0.05, c.start + 0.6);
-      await new Promise((r) => { v.onseeked = r; setTimeout(r, 4000); });
-      const cv = document.createElement('canvas');
-      cv.width = 180; cv.height = 320;
-      const scale = Math.max(180 / v.videoWidth, 320 / v.videoHeight);
-      const sw = 180 / scale, sh = 320 / scale;
-      cv.getContext('2d').drawImage(v, (v.videoWidth - sw) * state.pos, (v.videoHeight - sh) / 2, sw, sh, 0, 0, 180, 320);
-      const url = cv.toDataURL('image/jpeg', 0.78);
-      state.thumbs.set(key, url);
-      put(url);
-    } catch (e) { console.warn('[omniclip] thumbnail failed', e); }
-  });
-}
-
-// ---------- export ----------
-const exportQueue = [];
-let exporting = false;
-
-function exportOpts() {
-  const w = +radio('size');
-  return {
-    width: w, height: Math.round((w * 16) / 9),
-    layout: state.vertical ? 'crop' : radio('layout'),
-    pos: state.vertical ? 0.5 : state.pos,
-    captions: radio('caps'),
-    title: radio('title'),
-  };
-}
-
-function renderExportState(c) {
-  const el = c._el;
-  if (el) {
-    const box = el.querySelector('.clip-state');
-    const busy = c._progress != null, queued = exportQueue.includes(c) && !busy;
-    if (busy) {
-      const r = 13, len = 2 * Math.PI * r;
-      box.innerHTML = `<svg class="ring" viewBox="0 0 32 32" role="img" aria-label="Exporting ${Math.round(c._progress * 100)}%"><circle class="bg" cx="16" cy="16" r="${r}"/><circle class="fg" cx="16" cy="16" r="${r}" stroke-dasharray="${len}" stroke-dashoffset="${len * (1 - c._progress)}"/></svg>`;
-    } else if (queued) {
-      box.innerHTML = '<span class="queued">Queued</span>';
-    } else if (c._blobUrl) {
-      box.innerHTML = `<a class="icon-btn done" title="Saved · download again">${ICON.check}</a>`;
-      const a = box.querySelector('a');
-      a.href = c._blobUrl; a.download = c._fileName;
-    } else {
-      box.innerHTML = `<button class="icon-btn" type="button" title="Export this short">${ICON.down}</button>`;
-      const b = box.querySelector('button');
-      b.disabled = !exportMime;
-      b.onclick = () => queueExport(c);
-    }
-  }
-  if (c === state.sel) renderSelected();
-}
-
-function queueExport(c) {
-  if (exportQueue.includes(c) || c._progress != null) return;
-  exportQueue.push(c);
-  renderExportState(c);
-  runQueue();
-}
-
-async function runQueue() {
-  if (exporting) return;
-  exporting = true;
-  while (exportQueue.length) {
-    const c = exportQueue[0];
-    c._progress = 0;
-    renderExportState(c);
-    try {
-      const t0 = performance.now();
-      const blob = await exportClip({
-        url: state.url, clip: c, segments: state.segments, opts: exportOpts(),
-        onProgress: (p, label) => {
-          c._progress = p; c._label = label; renderExportState(c);
-          setStatus(`Exporting “${c.title}” · ${Math.round(p * 100)}%${exportQueue.length > 1 ? ` · ${exportQueue.length - 1} more in line` : ''}`);
-        },
-      });
-      const n = allClips().indexOf(c) + 1 || 1;
-      c._fileName = `${base()}-short-${n}-${c.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 40)}.${exportExt}`;
-      c._blobUrl = URL.createObjectURL(blob);
-      console.log(`[omniclip] exported ${c._fileName} ${(blob.size / 1e6).toFixed(1)} MB in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
-      const a = document.createElement('a');
-      a.href = c._blobUrl; a.download = c._fileName; a.click();
-      setStatus(`Saved ${c._fileName}`);
-    } catch (err) {
-      console.error(err);
-      setStatus('Export failed: ' + (err.message || err));
-      alert('Export failed: ' + (err.message || err));
-    }
-    c._progress = null;
-    exportQueue.shift();
-    renderExportState(c);
-  }
-  exporting = false;
-}
-
-$('exAll').onclick = () => allClips().forEach((c) => { if (!c._blobUrl) queueExport(c); });
-
-// ---------- transcript: times jump the player; text is editable (captions use the fix) ----------
-function addTranscript(segs) {
-  $('transcriptEmpty')?.remove();
-  for (const s of segs) {
-    const i = state.segments.indexOf(s);
-    const p = document.createElement('p');
-    p.dataset.t = s.start;
-    p.dataset.i = i;
-    const time = document.createElement('time');
-    time.textContent = fmt(s.start);
-    time.title = 'Play from here';
-    time.onclick = () => { state.stopAt = null; $('player').currentTime = s.start; $('player').play(); };
-    const text = document.createElement('span');
-    text.className = 't';
-    text.contentEditable = 'plaintext-only';
-    text.spellcheck = false;
-    text.textContent = s.text;
-    text.oninput = () => {
-      s.text = text.textContent.replace(/\s+/g, ' ').trim();
-      s._edited = true;
-      clearTimeout(state.saveTimer);
-      state.saveTimer = setTimeout(saveTranscript, 400);
+// ---------- saved projects: drafts, project files, relinking ----------
+async function renderDrafts() {
+  const all = (await dbAll('projects').catch(() => [])).map((x) => x.value).filter((p) => p?.sources).sort((a, b) => b.updated - a.updated).slice(0, 8);
+  $('drafts').hidden = !all.length;
+  $('draftList').innerHTML = '';
+  for (const p of all) {
+    const li = document.createElement('li');
+    li.className = 'draft';
+    li.innerHTML = `<div class="draft-main"><div class="draft-name">${esc(p.name)}</div><div class="draft-meta">${p.clips.length} clip${p.clips.length === 1 ? '' : 's'} · ${esc(p.sources.map((s) => s.name).join(', '))} · ${new Date(p.updated).toLocaleDateString()}</div></div>
+      <button class="btn btn-outline btn-sm" type="button" data-a="open">Open</button><button class="link-btn" type="button" data-a="rm" aria-label="Remove project ${esc(p.name)}">Remove</button>`;
+    li.querySelector('[data-a="open"]').onclick = () => relink(p);
+    li.querySelector('[data-a="rm"]').onclick = async () => {
+      if (await ask('Remove this project?', `<p>“${esc(p.name)}” and its clips will be removed from this device. Your video files are not touched.</p>`, [{ label: 'Cancel', value: false }, { label: 'Remove', value: true, solid: true }]) !== true) return;
+      await dbDel('projects', p.id); renderDrafts();
     };
-    text.onblur = () => {
-      if (!s._edited) return;
-      s._edited = false;
-      allClips().forEach((c) => {
-        if (c.end > s.start && c.start < s.end) { c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' '); c._blobUrl = null; renderExportState(c); }
-      });
-    };
-    text.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); text.blur(); } };
-    p.append(time, text);
-    $('transcript').append(p);
+    $('draftList').append(li);
   }
 }
-
-$('fromSel').onclick = () => {
-  const sel = window.getSelection();
-  const ps = [sel.anchorNode, sel.focusNode]
-    .map((n) => (n?.nodeType === 1 ? n : n?.parentElement)?.closest('#transcript p[data-i]'))
-    .filter(Boolean);
-  if (!ps.length || sel.isCollapsed) { setStatus('Select some lines in the transcript first: click and drag over the text.'); alert('Select some lines in the transcript first: click and drag over the text, then press this button.'); return; }
-  const idx = ps.map((p) => +p.dataset.i).sort((a, b) => a - b);
-  const a = state.segments[idx[0]], b = state.segments[idx[idx.length - 1]];
-  const clip = {
-    id: nextId++,
-    start: a.start, end: b.end,
-    title: a.text.replace(/[.!?,]$/, '').split(/\s+/).slice(0, 8).join(' '),
-    hook: 'Your own pick', score: '★',
-    text: clipWords(state.segments, a.start, b.end).map((w) => w.w).join(' '),
+renderDrafts();
+const openProjectFile = () => { $('projFile').value = ''; $('projFile').click(); };
+$('openProj').onclick = openProjectFile;
+$('projFile').onchange = async () => {
+  const f = $('projFile').files[0]; if (!f) return;
+  try { relink(parseProjectFile(await f.text())); } catch (e) { announce(e.message); await ask('Couldn’t open the project', `<p>${esc(e.message)}</p>`, [{ label: 'OK', solid: true }]); }
+};
+// Ask for each source file again; check size and duration so the edit lands on the right video.
+function relink(proj) {
+  const d = $('relink'), list = $('relinkList');
+  const chosen = {};
+  const render = () => {
+    list.innerHTML = '';
+    proj.sources.forEach((s) => {
+      const f = chosen[s.id];
+      const li = document.createElement('li');
+      const ok = f && f.size === s.size;
+      li.innerHTML = `<div>${esc(s.name)}<span class="meta">${s.duration ? fmt(s.duration) + ' · ' : ''}${mb(s.size)}${f ? ` → <span class="${ok ? 'ok' : 'bad'}">${esc(f.name)} (${mb(f.size)})${ok ? ' ✓' : ' · different size'}</span>` : ''}</span></div><button class="btn btn-outline btn-sm" type="button">${f ? 'Change' : 'Choose file'}</button>`;
+      li.querySelector('button').onclick = () => {
+        const inp = Object.assign(document.createElement('input'), { type: 'file', accept: 'video/*,audio/*' });
+        inp.onchange = () => { if (inp.files[0]) { chosen[s.id] = inp.files[0]; render(); } };
+        inp.click();
+      };
+      list.append(li);
+    });
+    const main = chosen[proj.sources[0].id];
+    $('relinkGo').disabled = !main;
+    const bad = Object.entries(chosen).filter(([id, f]) => f.size !== proj.sources.find((s) => s.id === id).size);
+    $('relinkMsg').textContent = bad.length ? 'A chosen file has a different size than the original. If it is a different video, clip times may not match.' : !main ? 'Choose at least the first video.' : '';
   };
-  state.mine.unshift(clip);
-  $('clipsEmpty').classList.remove('failed');
-  showClips();
-  sel.removeAllRanges();
-  showTab('clipsPane');
-  select(clip);
-  setStatus('Added your own short');
+  render();
+  $('relinkGo').onclick = async () => {
+    d.close();
+    for (const s of proj.sources) if (chosen[s.id]) linkFile(s, chosen[s.id]);
+    load(proj);
+    openEditor();
+    for (const s of proj.sources) if (chosen[s.id]) {
+      if (!s.duration) { const meta = await readMeta(R.urls[s.id]); if (meta) quiet((p) => Object.assign(p.sources.find((x) => x.id === s.id), meta)); }
+      readPeaks(s.id);
+    }
+    selectClip(proj.clips[0]?.id || null, { quiet: true });
+    announce(`Opened “${proj.name}” with ${proj.clips.length} clip${proj.clips.length === 1 ? '' : 's'}.`);
+  };
+  d.showModal();
+}
+R.hooks.relinkOne = (srcId) => {
+  const inp = Object.assign(document.createElement('input'), { type: 'file', accept: 'video/*,audio/*' });
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    const s = sourceById(srcId);
+    if (f.size !== s.size && await ask('Different file?', `<p>${esc(f.name)} is ${mb(f.size)}; the original was ${mb(s.size)}. Use it anyway?</p>`, [{ label: 'Cancel', value: false }, { label: 'Use it', value: true, solid: true }]) !== true) return;
+    linkFile(s, f); quiet(() => {}, 'clips'); readPeaks(srcId);
+  };
+  inp.click();
 };
 
-// ---------- remembered transcripts (IndexedDB, on this device only) ----------
-function db() {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open('omniclip', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('transcripts');
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-async function dbGet(key) {
-  const d = await db();
-  return new Promise((res) => { const q = d.transaction('transcripts').objectStore('transcripts').get(key); q.onsuccess = () => res(q.result); q.onerror = () => res(null); });
-}
-async function dbSet(key, val) {
-  const d = await db();
-  return new Promise((res) => { const tx = d.transaction('transcripts', 'readwrite'); tx.objectStore('transcripts').put(val, key); tx.oncomplete = res; tx.onerror = res; });
-}
-const transcriptKey = () => {
-  const f = state.file;
-  return `${f.name}|${f.size}|${f.lastModified}|${asrModel()}|${$('lang').value}`;
+// ---------- project menu ----------
+const menu = $('projectMenu');
+$('projectBtn').onclick = (e) => { e.stopPropagation(); const open = menu.hidden; menu.hidden = !open; $('projectBtn').setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button').focus(); };
+addEventListener('click', (e) => { if (!menu.hidden && !e.target.closest('.menu-wrap')) { menu.hidden = true; $('projectBtn').setAttribute('aria-expanded', 'false'); } });
+menu.addEventListener('keydown', (e) => {
+  const items = qsa('button', menu), i = items.indexOf(document.activeElement);
+  if (e.key === 'Escape') { menu.hidden = true; $('projectBtn').focus(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus(); }
+});
+menu.addEventListener('click', (e) => {
+  const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
+  menu.hidden = true;
+  if (act === 'saveFile') { saveFile(`${safeName(P.project.name)}.omniclip.json`, projectFile(), 'application/json'); announce('Saved the project file. It holds your edits, not the video.'); }
+  if (act === 'openFile') openProjectFile();
+  if (act === 'addMedia') { $('mediaFile').value = ''; $('mediaFile').click(); }
+  if (act === 'storage') openStorage();
+});
+
+// ---------- background-safe export (beta), loaded only when used ----------
+R.hooks.fastExport = async (job, opts) => {
+  const mod = await import('./fastexport.js');
+  if (!mod.fastSupported()) throw new Error('Background-safe export needs WebCodecs (recent Chrome or Edge). Turn it off to use the normal export.');
+  return mod.fastExportClip(job, opts);
 };
-function saveTranscript() {
-  if (state.file && state.segments.length) dbSet(transcriptKey(), { segments: state.segments, saved: Date.now() }).catch(() => {});
-}
-
-// ---------- downloads ----------
-function save(name, text, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name;
-  a.click();
-}
-const base = () => (state.file?.name || 'video').replace(/\.[^.]+$/, '');
-const srtTime = (t) => {
-  const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = Math.floor(t % 60), ms = Math.round((t % 1) * 1000);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
-};
-$('srt').onclick = () => save(base() + '.srt',
-  state.segments.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`).join('\n'),
-  'text/plain');
-$('json').onclick = () => save(base() + '.shorts.json', JSON.stringify(allClips().map(({ _el, _blobUrl, _progress, _label, _fileName, _titleEdited, id, ...c }) => c), null, 2), 'application/json');
-
-// ---------- keyboard: ↑/↓ choose a short, Space previews it, E exports it ----------
-addEventListener('keydown', (e) => {
-  if (!state.file || e.ctrlKey || e.metaKey || e.altKey) return;
-  const t = e.target;
-  if (t.closest?.('input, select, textarea, [contenteditable="plaintext-only"], [contenteditable="true"], video')) return;
-  if ((e.key === ' ' || e.key === 'Enter') && t.closest?.('button, a, .clip')) return; // those handle their own keys
-  const list = allClips();
-  if (!list.length) return;
-  const i = list.indexOf(state.sel);
-  if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); select(list[Math.min(list.length - 1, i + 1)]); state.sel._el?.scrollIntoView({ block: 'nearest' }); }
-  else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); select(list[Math.max(0, i - 1)]); state.sel._el?.scrollIntoView({ block: 'nearest' }); }
-  else if (e.key === ' ' && state.sel) { e.preventDefault(); const v = $('player'); if (v.paused) playClip(state.sel); else v.pause(); }
-  else if ((e.key === 'e' || e.key === 'E') && state.sel) { e.preventDefault(); queueExport(state.sel); }
-});
-
-// Exports record in real time and stall in a hidden tab: say so in the tab title.
-const baseTitle = () => `${state.file?.name || ''} · OMNICLIP`;
-document.addEventListener('visibilitychange', () => {
-  if (!exporting) { document.title = state.file ? baseTitle() : document.title; return; }
-  if (document.hidden) document.title = '⏸ Export paused · come back to OMNICLIP';
-  else { document.title = baseTitle(); setStatus('Export resumed. Keep this tab visible until it finishes.'); }
-});
-addEventListener('beforeunload', (e) => {
-  const unsaved = !state.leaving && (exporting || exportQueue.length || state.picking || Object.values(progress).some((p) => p.active));
-  if (unsaved) { e.preventDefault(); e.returnValue = ''; }
-});
