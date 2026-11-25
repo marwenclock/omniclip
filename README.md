@@ -51,6 +51,10 @@ python -m http.server 5191
 
 then open http://localhost:5191.
 
+### Deploy
+
+`npx wrangler deploy` first runs `node tools/build.mjs` (no dependencies), which builds `dist/`: the site minus repo-only files (`.assetsignore`), with `style.css` inlined into `index.html`, the guide pages from `tools/pages.mjs`, `sitemap.xml`, `robots.txt`, `llms.txt` and `_headers` (cache and security headers). Preview the built site with `node tools/build.mjs && python -m http.server 5198 -d dist`.
+
 To make test audio on Windows: `powershell -File test/make-test-audio.ps1` (uses the built-in Windows voice).
 
 ## How it's built

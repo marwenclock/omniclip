@@ -3,21 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>OMNICLIP · Free shorts maker and video editor in your browser · by BANKASI MEDIA</title>
-<meta name="description" content="Turn long videos and podcasts into vertical shorts with captions, or cut a video by hand. Free, in your browser, processed on your device. No upload, no account, no watermark.">
+<title>OMNICLIP: Free AI Shorts Maker, No Upload, No Watermark</title>
+<meta name="description" content="Turn long videos and podcasts into vertical shorts with captions, free. AI finds the best moments on your device: no upload, no account, no watermark.">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="theme-color" content="#0a0a0a">
+<meta name="color-scheme" content="dark">
+<meta name="author" content="BANKASI MEDIA">
+<meta name="application-name" content="OMNICLIP">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OMNICLIP">
-<meta property="og:title" content="OMNICLIP · Long video in, shorts out">
-<meta property="og:description" content="Free on-device shorts maker and editor: finds the best moments, follows the speaker, burns in captions. Nothing is uploaded.">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="OMNICLIP: Long video in, shorts out. Free and on your device">
+<meta property="og:description" content="Free AI shorts maker and video editor: finds the best moments, follows the speaker, burns in captions. Nothing is uploaded.">
 <meta property="og:url" content="https://useomniclip.com/">
 <meta property="og:image" content="https://useomniclip.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="OMNICLIP: long video in, vertical shorts with captions out">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OMNICLIP: Free AI Shorts Maker, No Upload, No Watermark">
+<meta name="twitter:description" content="Turn long videos and podcasts into captioned vertical shorts, right in your browser. Nothing is uploaded.">
 <meta name="twitter:image" content="https://useomniclip.com/og.png">
 <link rel="canonical" href="https://useomniclip.com/">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","@id":"https://useomniclip.com/#org","name":"BANKASI MEDIA","url":"https://bankasimedia.com/","logo":"https://useomniclip.com/icon-512.png","sameAs":["https://github.com/marwenclock"]},
+{"@type":"WebSite","@id":"https://useomniclip.com/#website","name":"OMNICLIP","alternateName":"OMNICLIP by BANKASI MEDIA","url":"https://useomniclip.com/","inLanguage":"en","publisher":{"@id":"https://useomniclip.com/#org"}},
+{"@type":"WebApplication","@id":"https://useomniclip.com/#app","name":"OMNICLIP","url":"https://useomniclip.com/","description":"Free AI shorts maker and video editor that runs in your browser. Turns long videos and podcasts into vertical shorts with captions, entirely on your device.","applicationCategory":"MultimediaApplication","applicationSubCategory":"Video editor","operatingSystem":"Windows, macOS, Linux, ChromeOS","browserRequirements":"Requires a recent desktop Chrome or Edge with WebGPU","isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://useomniclip.com/og.png","screenshot":"https://useomniclip.com/og.png","featureList":["Finds the best moments in long videos and podcasts with on-device AI","Automatic captions with styles, burned into the video","Speaker-following 9:16 reframing","Timeline editor: split, trim, cut pauses, change speed","Exports 1080p or 720p MP4","SRT subtitle export","Audiograms for audio-only podcasts","No upload, no account, no watermark"],"publisher":{"@id":"https://useomniclip.com/#org"},"isPartOf":{"@id":"https://useomniclip.com/#website"}},
+{"@type":"FAQPage","@id":"https://useomniclip.com/#faq","mainEntity":[
+{"@type":"Question","name":"Is OMNICLIP really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. OMNICLIP is free and open source under the MIT licence. There are no plans, credits, ads or watermarks, and you don't need an account."}},
+{"@type":"Question","name":"Are my videos uploaded anywhere?","acceptedAnswer":{"@type":"Answer","text":"No. Your video is decoded, transcribed, edited and exported inside your browser tab. The only downloads are the open-source AI models, fetched once and then cached by your browser."}},
+{"@type":"Question","name":"Which browsers and computers does it work on?","acceptedAnswer":{"@type":"Answer","text":"A recent desktop Chrome or Edge with WebGPU. It runs on integrated graphics, and computers with a dedicated graphics card or Apple Silicon are much faster."}},
+{"@type":"Question","name":"What platforms are the shorts made for?","acceptedAnswer":{"@type":"Answer","text":"OMNICLIP exports vertical 9:16 MP4 files with burned-in captions that you can post to YouTube Shorts, TikTok and Instagram Reels. You can also export 4:5, 1:1, 16:9 or the original shape."}},
+{"@type":"Question","name":"Which languages can it transcribe?","acceptedAnswer":{"@type":"Answer","text":"English, Spanish, French, German, Portuguese, Italian and Arabic. You can also import your own SRT or VTT subtitles."}},
+{"@type":"Question","name":"Can I edit a video by hand instead?","acceptedAnswer":{"@type":"Answer","text":"Yes. Choose Edit a video to open the file straight away as one clip. Split, trim, reframe and add captions later, with no transcription needed."}},
+{"@type":"Question","name":"How long does an export take?","acceptedAnswer":{"@type":"Answer","text":"Exports run in real time, so a 30-second short takes about 30 seconds, and the tab must stay visible. A background-safe export (beta) renders frame by frame instead."}}
+]}
+]}
+</script>
 <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -147,6 +173,81 @@
     <ul class="facts">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Nothing uploaded</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>No account</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>No watermark</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>No ads</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Free and open source</li>
     </ul>
+
+    <!-- what it is, for people and search engines; hidden with the start screen once a video is open -->
+    <div class="learn">
+      <section class="learn-block" aria-labelledby="whatTitle">
+        <h2 id="whatTitle">A free AI shorts maker that never uploads your video</h2>
+        <p>OMNICLIP turns long videos and podcasts into vertical shorts with captions. It transcribes the speech, finds the strongest moments, follows the speaker into a 9:16 frame and burns in styled captions. Everything happens in your browser, on your own computer. There is no upload queue, no monthly plan and no watermark on your clips.</p>
+      </section>
+
+      <section class="learn-block" aria-labelledby="howTitle">
+        <h2 id="howTitle">How it works</h2>
+        <ol class="steps">
+          <li><b>Drop a long video or podcast.</b> MP4, MOV, WebM, MP3 or WAV. The file stays on your computer.</li>
+          <li><b>OMNICLIP finds the moments.</b> It transcribes the audio on your graphics card and rates each moment for a strong hook, an idea that stands alone and a payoff.</li>
+          <li><b>Polish and export.</b> Adjust timing, captions and framing in the editor, then download 1080p MP4 shorts, one by one or as a zip.</li>
+        </ol>
+      </section>
+
+      <section class="learn-block" aria-labelledby="featTitle">
+        <h2 id="featTitle">Everything you need to clip long videos</h2>
+        <div class="feat-grid">
+          <div class="feat"><h3>AI clip finder</h3><p>On-device AI picks and titles the best moments of a long video, or use Instant mode with nothing extra to download.</p></div>
+          <div class="feat"><h3>Automatic captions</h3><p>Word-timed captions with presets, fonts, colours and positions, burned into the video. Download subtitles as SRT too.</p></div>
+          <div class="feat"><h3>Speaker follow</h3><p>Face tracking keeps the person talking in a vertical frame. Or choose fixed, blurred-background or fitted framing.</p></div>
+          <div class="feat"><h3>A real editor</h3><p>Timeline with waveform, split, trim, reorder, cut long pauses automatically, change speed, undo and redo.</p></div>
+          <div class="feat"><h3>Every shape</h3><p>9:16 for Shorts, TikTok and Reels, plus 4:5, 1:1, 16:9 or the original. Add an image or video overlay and fades.</p></div>
+          <div class="feat"><h3>Podcasts and audio</h3><p>Audio-only episodes become audiograms with a title, level bars and captions, ready to post.</p></div>
+        </div>
+      </section>
+
+      <section class="learn-block" aria-labelledby="vsTitle">
+        <h2 id="vsTitle">OMNICLIP compared with cloud clip makers</h2>
+        <div class="table-wrap">
+          <table class="vs">
+            <thead><tr><th scope="col"></th><th scope="col">OMNICLIP</th><th scope="col">Typical cloud clip maker</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Price</th><td>Free, no limits</td><td>Monthly plan or credits</td></tr>
+              <tr><th scope="row">Your video</th><td>Stays on your computer</td><td>Uploaded to their servers</td></tr>
+              <tr><th scope="row">Account</th><td>None</td><td>Required</td></tr>
+              <tr><th scope="row">Watermark</th><td>Never</td><td>Often on free exports</td></tr>
+              <tr><th scope="row">Waiting</th><td>No upload or queue</td><td>Upload, then processing queue</td></tr>
+              <tr><th scope="row">Source code</th><td>Open (MIT)</td><td>Closed</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="learn-block" aria-labelledby="faqTitle">
+        <h2 id="faqTitle">Questions</h2>
+        <div class="faq">
+          <details><summary>Is OMNICLIP really free?</summary><p>Yes. OMNICLIP is free and open source under the MIT licence. There are no plans, credits, ads or watermarks, and you don't need an account.</p></details>
+          <details><summary>Are my videos uploaded anywhere?</summary><p>No. Your video is decoded, transcribed, edited and exported inside your browser tab. The only downloads are the open-source AI models, fetched once and then cached by your browser.</p></details>
+          <details><summary>Which browsers and computers does it work on?</summary><p>A recent desktop Chrome or Edge with WebGPU. It runs on integrated graphics, and computers with a dedicated graphics card or Apple Silicon are much faster.</p></details>
+          <details><summary>What platforms are the shorts made for?</summary><p>OMNICLIP exports vertical 9:16 MP4 files with burned-in captions that you can post to YouTube Shorts, TikTok and Instagram Reels. You can also export 4:5, 1:1, 16:9 or the original shape.</p></details>
+          <details><summary>Which languages can it transcribe?</summary><p>English, Spanish, French, German, Portuguese, Italian and Arabic. You can also import your own SRT or VTT subtitles.</p></details>
+          <details><summary>Can I edit a video by hand instead?</summary><p>Yes. Choose Edit a video to open the file straight away as one clip. Split, trim, reframe and add captions later, with no transcription needed.</p></details>
+          <details><summary>How long does an export take?</summary><p>Exports run in real time, so a 30-second short takes about 30 seconds, and the tab must stay visible. A background-safe export (beta) renders frame by frame instead.</p></details>
+        </div>
+      </section>
+
+      <nav class="learn-block" aria-labelledby="guidesTitle">
+        <h2 id="guidesTitle">Guides</h2>
+        <ul class="guide-list">
+          <li><a href="/podcast-to-shorts/">Turn a podcast into shorts</a></li>
+          <li><a href="/youtube-shorts-maker/">Make YouTube Shorts from long videos</a></li>
+          <li><a href="/auto-captions/">Add captions to a video automatically</a></li>
+          <li><a href="/vertical-video-converter/">Convert horizontal video to vertical 9:16</a></li>
+          <li><a href="/opusclip-alternative/">A free, private OpusClip alternative</a></li>
+        </ul>
+      </nav>
+
+      <footer class="site-foot">
+        <p>OMNICLIP is made by <a href="https://bankasimedia.com" rel="noopener">BANKASI MEDIA</a>, maker of the free <a href="https://github.com/marwenclock/omniviewer3d" rel="noopener">OMNIVIEWER</a> 3D viewer.</p>
+        <p><a href="/privacy/">Privacy</a> · <a href="https://github.com/marwenclock/omniclip" rel="noopener">Source code</a> · <a href="https://github.com/marwenclock/omniclip/issues" rel="noopener">Report a problem</a> · © 2026 BANKASI MEDIA</p>
+      </footer>
+    </div>
   </section>
 
   <!-- ============================== editor ============================== -->

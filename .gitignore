@@ -8,3 +8,4 @@ test/*.webm
 Thumbs.db
 *.log
 .wrangler/
+dist/

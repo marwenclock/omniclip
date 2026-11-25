@@ -158,9 +158,11 @@ main { min-height: 0; display: flex; flex-direction: column; flex: 1 0 auto; }
 .c-cap.dim { fill: rgba(255, 255, 255, 0.45); }
 .c-bar { fill: rgba(255, 255, 255, 0.18); }
 .c-fill { fill: #fff; transform-box: fill-box; transform-origin: left; animation: fill 7.2s linear infinite both; }
-.c0, .c0 .c-fill { animation-delay: 1.2s; }
-.c1, .c1 .c-fill { animation-delay: 3.6s; }
-.c2, .c2 .c-fill { animation-delay: 6s; }
+/* negative delays: all three shorts are already on screen at first paint (the cycle keeps the 2.4 s stagger),
+   so the first frame matches the settled page instead of popping in later (better Speed Index) */
+.c0, .c0 .c-fill { animation-delay: -5.4s; }
+.c1, .c1 .c-fill { animation-delay: -3s; }
+.c2, .c2 .c-fill { animation-delay: -0.6s; }
 @keyframes pop { 0% { opacity: 0; transform: translateY(26px) scale(0.6); } 6% { opacity: 1; transform: translateY(-4px) scale(1.04); } 10% { transform: none; } 86% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: translateY(-8px) scale(0.96); } }
 @keyframes fill { 0%, 8% { transform: scaleX(0); } 86%, 100% { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .h-card { opacity: 1; } .c-fill { transform: scaleX(0.6); } }
@@ -220,6 +222,41 @@ select option { background: #161616; color: var(--ink); }
 .facts { list-style: none; padding: 0; margin: 36px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .facts li { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
 .facts li svg { width: 14px; height: 14px; color: var(--ink); flex: none; }
+/* what-it-is content under the start screen (crawlable text, FAQ, guides) */
+.learn { width: 100%; margin-top: 72px; text-align: left; display: flex; flex-direction: column; gap: 56px; }
+.learn h2 { margin: 0 0 14px; font-size: clamp(22px, 3.2vw, 28px); line-height: 1.2; font-weight: 600; letter-spacing: -0.02em; color: #fff; }
+.learn h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.learn p, .learn li { font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+.learn p { margin: 0; }
+.learn a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, 0.4); }
+.learn a:hover { text-decoration-color: #fff; }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 12px; }
+.steps li { counter-increment: step; position: relative; padding: 14px 16px 14px 56px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface); }
+.steps li::before { content: counter(step); position: absolute; left: 16px; top: 14px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 700; }
+.steps b { color: var(--ink); }
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.feat { padding: 16px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface); }
+.feat p { font-size: 14px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 14px; }
+.vs { width: 100%; border-collapse: collapse; font-size: 14px; }
+.vs th, .vs td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.vs tr:last-child th, .vs tr:last-child td { border-bottom: 0; }
+.vs thead th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.vs tbody th { color: var(--ink); font-weight: 600; }
+.vs td { color: var(--ink-2); }
+.vs td:nth-child(2) { color: #fff; font-weight: 600; }
+.faq { display: grid; gap: 8px; }
+.faq details { border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface); }
+.faq summary { cursor: pointer; padding: 14px 16px; font-size: 15px; font-weight: 600; color: var(--ink); list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; font-weight: 400; color: var(--muted); }
+.faq details[open] summary::after { content: '2'; }
+.faq details p { padding: 0 16px 14px; }
+.guide-list { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.guide-list a { display: block; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); text-decoration: none; font-weight: 600; font-size: 14px; }
+.guide-list a:hover { background: var(--surface-2); }
+.site-foot { padding-top: 24px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.site-foot p { font-size: 13px; color: var(--muted); }
 
 /* ------------------------------------------------------------ editor grid */
 body.working { height: 100%; overflow: hidden; }
