@@ -50,15 +50,42 @@ function loadOptions() {
 }
 const saveStyle = () => localStorage.setItem(STYLE_KEY, JSON.stringify({ layout: radio('layout'), caps: radio('caps'), title: radio('title'), size: radio('size'), pos: state.pos }));
 function explainOptions() {
-  $('optHelp').textContent = `${FINDER_HELP[finder()]} ${QUALITY_HELP[$('quality').value]}`;
+  const n = $('count').value;
+  const countHelp = n === 'auto'
+    ? 'Auto shorts: about one per 2 minutes of video.'
+    : +n >= 8 ? `${n} shorts suits videos longer than about ${n * 2} minutes.` : '';
+  $('optHelp').textContent = `${FINDER_HELP[finder()]} ${QUALITY_HELP[$('quality').value]} ${countHelp}`;
+  // Steer people away from settings their computer can't run well.
+  let warn = null;
+  if (gpu.weak && finder() === 'deep') warn = { text: `Your computer has ${gpu.name}, so Deep picking will be very slow.`, fix: 'Use Smart', apply: () => { $('finder').value = 'smart'; } };
+  else if (gpu.weak && $('quality').value === 'best') warn = { text: `Your computer has ${gpu.name}, so Best accuracy will be very slow.`, fix: 'Use Better', apply: () => { $('quality').value = 'better'; } };
+  else if (!hasGPU && gpuChecked && finder() !== 'instant') warn = { text: 'Without graphics card access, moments are picked from the transcript (Instant).', fix: 'OK', apply: () => { $('finder').value = 'instant'; } };
+  $('optWarn').hidden = !warn;
+  if (warn) {
+    $('optWarn').querySelector('span').textContent = warn.text;
+    const b = $('optWarn').querySelector('button');
+    b.textContent = warn.fix;
+    b.onclick = () => { warn.apply(); saveOptions(); };
+  }
 }
 document.querySelectorAll('#options select').forEach((el) => el.addEventListener('change', saveOptions));
-loadOptions();
 
 // ---------- capability check (not awaited at top level: the file picker works immediately) ----------
-let hasGPU = false;
+let hasGPU = false, gpuChecked = false;
+const gpu = { weak: false, name: '' };
+loadOptions();
 const gpuReady = (async () => {
-  hasGPU = !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
+  const adapter = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
+  hasGPU = !!adapter;
+  gpuChecked = true;
+  if (adapter) {
+    const info = adapter.info || {};
+    const id = `${info.vendor || ''} ${info.architecture || ''} ${info.description || ''}`;
+    // Built-in Intel graphics (and cards without half-precision support) run the bigger models very slowly.
+    if (/intel/i.test(id)) { gpu.weak = true; gpu.name = 'built-in Intel graphics'; }
+    else if (!adapter.features.has('shader-f16')) { gpu.weak = true; gpu.name = 'an older graphics card'; }
+  }
+  explainOptions();
   if (!hasGPU) {
     $('gpuNote').textContent = 'This browser can’t use your graphics card, so transcription will be slow and moments are picked without AI. For the full experience, use a recent Chrome or Edge on a computer.';
     $('gpuNote').hidden = false;
@@ -117,8 +144,51 @@ addEventListener('drop', (e) => {
 });
 $('newVideo').onclick = () => {
   if ((exporting || exportQueue.length) && !confirm('An export is still running. Start over anyway?')) return;
+  state.leaving = true;
   location.href = './';
 };
+
+// ---------- how many shorts: recommend by length, warn when the ask is too many ----------
+// About one short per 2 minutes: beyond that the picks overlap or get weak.
+const recommendCount = (sec) => Math.max(1, Math.min(12, Math.ceil(sec / 120)));
+function chooseTarget(duration) {
+  const asked = $('count').value;
+  const rec = recommendCount(duration);
+  if (asked === 'auto') { state.target = rec; return; }
+  state.target = +asked;
+  if (+asked > Math.max(rec * 1.5, rec + 2)) {
+    state.target = rec;
+    showNotice(
+      `This video is <b>${fmt(duration)}</b> long. ${asked} shorts from it would mean weak, overlapping moments, so OMNICLIP will make the best <b>${rec}</b>.`,
+      `Make ${asked} anyway`,
+      () => { state.target = +asked; hideNotice(); repick(); },
+    );
+  }
+}
+function showNotice(html, action, onAction) {
+  const n = $('notice');
+  n.querySelector('p').innerHTML = html;
+  const b = n.querySelector('button');
+  b.hidden = !action;
+  b.textContent = action || '';
+  b.onclick = onAction;
+  n.hidden = false;
+}
+const hideNotice = () => { $('notice').hidden = true; };
+// Re-run the picking with a new count once the transcript exists (ratings are remembered).
+async function repick() {
+  if (!state.picked) return; // picking hasn't started yet: it will use the new count
+  if (state.picking) { state.repickAfter = true; return; }
+  if (state.mode === 'instant') pickInstant();
+  else await pickSmart(state.target, FINDER[state.mode].shortlist);
+}
+const metadata = () => new Promise((res) => {
+  const v = $('player');
+  if (v.readyState >= 1) return res();
+  v.addEventListener('loadedmetadata', res, { once: true });
+  v.addEventListener('error', res, { once: true });
+  setTimeout(res, 8000);
+});
 
 // ---------- side tabs ----------
 function showTab(id) {
@@ -146,16 +216,23 @@ async function start(file) {
   $('player').src = state.url;
   $('player').addEventListener('loadedmetadata', () => {
     $('fileMeta').textContent = `${fmt($('player').duration)} · ${mb(file.size)}`;
-    const audioOnly = !$('player').videoWidth;
+    const v = $('player');
+    const audioOnly = !v.videoWidth;
+    state.vertical = !audioOnly && v.videoHeight >= v.videoWidth * 1.2;
     $('stage').classList.toggle('audio', audioOnly);
-    document.querySelector('.dock-group[aria-label="Framing"]').hidden = audioOnly;
+    // Already-vertical footage is used as it is: no framing choice to make.
+    document.querySelector('.dock-group[aria-label="Framing"]').hidden = audioOnly || state.vertical;
     layoutCrop();
   }, { once: true });
   if (!exportMime) $('exNote').textContent = 'This browser can’t record video, so exporting is unavailable here. Use Chrome or Edge on a computer.';
   const t0 = performance.now();
   try {
+    await metadata();
+    chooseTarget($('player').duration || 0);
+    if (state.vertical) showNotice('Your video is already vertical, so shorts keep its full frame.', null, null);
     await gpuReady;
     const mode = hasGPU ? finder() : 'instant';
+    state.mode = mode;
     // Load the moment finder while transcription runs, so its download overlaps.
     const llmReady = mode === 'instant' ? null : loadPicker(FINDER[mode].model);
     llmReady?.catch(() => {}); // surfaced below
@@ -170,8 +247,9 @@ async function start(file) {
       saveTranscript();
     }
     if (!state.segments.length) throw new Error('No speech was found in this file.');
+    state.picked = true;
     if (mode === 'instant') pickInstant();
-    else { await llmReady; await pickSmart(+$('count').value, FINDER[mode].shortlist); }
+    else { await llmReady; await pickSmart(state.target, FINDER[mode].shortlist); }
     setStatus(`Done in ${eta((performance.now() - t0) / 1000)} · ${shorts(allClips().length)} ready to export${state.aiFailed ? ' · the on-device AI stopped responding, so moments were picked from the transcript' : ''}`);
   } catch (err) {
     console.error(err);
@@ -260,7 +338,10 @@ const tag = (list) => { for (const c of list) c.id ||= nextId++; return list; };
 
 // Smart: transcript signals set the cuts and show at once; the on-device AI then
 // rates and titles each one, and the list re-sorts as its verdicts come in.
+const rated = new Map(); // "start-end" -> { score, title }, so a re-pick doesn't ask the AI again
+const keyOf = (c) => `${c.start.toFixed(2)}-${c.end.toFixed(2)}`;
 async function pickSmart(n, factor) {
+  state.picking = true;
   const shortlist = tag(instantClips(state.segments, Math.ceil(n * factor)));
   state.clips = shortlist.slice(0, n);
   showClips();
@@ -270,9 +351,12 @@ async function pickSmart(n, factor) {
   for (let i = 0; i < shortlist.length; i++) {
     const c = shortlist[i];
     try {
-      const r = await rateClip({ ...c });
-      c.score = r.score;
-      if (!c._titleEdited) c.title = r.title;
+      const r = rated.get(keyOf(c)) || (state.aiFailed ? null : await rateClip({ ...c }));
+      if (r) {
+        rated.set(keyOf(c), { score: r.score, title: r.title });
+        c.score = r.score;
+        if (!c._titleEdited) c.title = r.title;
+      }
     } catch (e) {
       console.warn(e);
       // The graphics card gave up (common on weak GPUs): keep the transcript picks instead of failing every clip.
@@ -284,16 +368,22 @@ async function pickSmart(n, factor) {
     showClips();
   }
   step('stPick', { done: true });
+  state.picking = false;
   finishResults();
+  if (state.repickAfter) { state.repickAfter = false; repick(); }
 }
 
 function pickInstant() {
-  state.clips = tag(instantClips(state.segments, +$('count').value));
+  state.clips = tag(instantClips(state.segments, state.target));
   finishResults();
 }
 
 function finishResults() {
   showClips();
+  const found = state.clips.length;
+  if (found && found < state.target && $('notice').hidden) {
+    showNotice(`Only <b>${found}</b> strong ${found === 1 ? 'moment stands' : 'moments stand'} out in this video, so you get ${shorts(found)} instead of ${state.target}. Select lines in the transcript to make more.`, 'Open transcript', () => showTab('transcriptPane'));
+  }
   if (!allClips().length) {
     $('resultsSub').textContent = 'No clear moments found. Open the transcript, select some lines and make your own short.';
     $('clipsEmpty').classList.add('failed');
@@ -433,7 +523,7 @@ function highlightTranscript(c, scroll) {
 // ---------- 9:16 crop preview on the player (drag to choose the framing) ----------
 function layoutCrop() {
   const v = $('player'), box = $('crop'), layout = radio('layout');
-  if (!v.videoWidth || layout === 'blur' || v.videoWidth / v.videoHeight <= 9 / 16 + 0.01) { box.hidden = true; return; }
+  if (!v.videoWidth || layout === 'blur' || state.vertical || v.videoWidth / v.videoHeight <= 9 / 16 + 0.01) { box.hidden = true; return; }
   const W = v.clientWidth, H = v.clientHeight, s = Math.min(W / v.videoWidth, H / v.videoHeight);
   const cw = v.videoWidth * s, ch = v.videoHeight * s, cx = (W - cw) / 2, cy = (H - ch) / 2;
   const bw = (ch * 9) / 16;
@@ -541,8 +631,8 @@ function exportOpts() {
   const w = +radio('size');
   return {
     width: w, height: Math.round((w * 16) / 9),
-    layout: radio('layout'),
-    pos: state.pos,
+    layout: state.vertical ? 'crop' : radio('layout'),
+    pos: state.vertical ? 0.5 : state.pos,
     captions: radio('caps'),
     title: radio('title'),
   };
@@ -717,3 +807,30 @@ $('srt').onclick = () => save(base() + '.srt',
   state.segments.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`).join('\n'),
   'text/plain');
 $('json').onclick = () => save(base() + '.shorts.json', JSON.stringify(allClips().map(({ _el, _blobUrl, _progress, _label, _fileName, _titleEdited, id, ...c }) => c), null, 2), 'application/json');
+
+// ---------- keyboard: ↑/↓ choose a short, Space previews it, E exports it ----------
+addEventListener('keydown', (e) => {
+  if (!state.file || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t.closest?.('input, select, textarea, [contenteditable="plaintext-only"], [contenteditable="true"], video')) return;
+  if ((e.key === ' ' || e.key === 'Enter') && t.closest?.('button, a, .clip')) return; // those handle their own keys
+  const list = allClips();
+  if (!list.length) return;
+  const i = list.indexOf(state.sel);
+  if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); select(list[Math.min(list.length - 1, i + 1)]); state.sel._el?.scrollIntoView({ block: 'nearest' }); }
+  else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); select(list[Math.max(0, i - 1)]); state.sel._el?.scrollIntoView({ block: 'nearest' }); }
+  else if (e.key === ' ' && state.sel) { e.preventDefault(); const v = $('player'); if (v.paused) playClip(state.sel); else v.pause(); }
+  else if ((e.key === 'e' || e.key === 'E') && state.sel) { e.preventDefault(); queueExport(state.sel); }
+});
+
+// Exports record in real time and stall in a hidden tab: say so in the tab title.
+const baseTitle = () => `${state.file?.name || ''} · OMNICLIP`;
+document.addEventListener('visibilitychange', () => {
+  if (!exporting) { document.title = state.file ? baseTitle() : document.title; return; }
+  if (document.hidden) document.title = '⏸ Export paused · come back to OMNICLIP';
+  else { document.title = baseTitle(); setStatus('Export resumed. Keep this tab visible until it finishes.'); }
+});
+addEventListener('beforeunload', (e) => {
+  const unsaved = !state.leaving && (exporting || exportQueue.length || state.picking || Object.values(progress).some((p) => p.active));
+  if (unsaved) { e.preventDefault(); e.returnValue = ''; }
+});
