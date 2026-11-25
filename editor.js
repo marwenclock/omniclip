@@ -601,7 +601,7 @@ function renderMedia() {
   const ul = $('mediaList');
   ul.innerHTML = project().sources.map((s) => `<li class="media-item ${R.urls[s.id] ? '' : 'missing'}"><b title="${esc(s.name)}">${esc(s.name)}</b>
     <span class="meta">${s.duration ? fmt(s.duration) + ' · ' : ''}${mb(s.size)}${s.width ? ` · ${s.width}×${s.height}` : ' · audio'}${segsOf(s.id).length ? ' · transcript' : ''}${R.urls[s.id] ? '' : ' · not found'}</span>
-    <span class="row">${R.urls[s.id] ? `<button class="link-btn" data-mop="new" data-src="${s.id}" type="button">New clip from it</button><button class="link-btn" data-mop="append" data-src="${s.id}" type="button" ${selClip() ? '' : 'disabled'}>Add to selected clip</button>${segsOf(s.id).length ? '' : `<button class="link-btn" data-mop="asr" data-src="${s.id}" type="button">Transcribe</button>`}` : `<button class="link-btn" data-mop="relink" data-src="${s.id}" type="button">Find file…</button>`}</span></li>`).join('');
+    <span class="row">${R.urls[s.id] ? `<button class="btn btn-outline btn-sm" data-mop="new" data-src="${s.id}" type="button">New clip from it</button><button class="btn btn-outline btn-sm" data-mop="append" data-src="${s.id}" type="button" ${selClip() ? '' : 'disabled'}>Add to selected clip</button>${segsOf(s.id).length ? '' : `<button class="btn btn-outline btn-sm" data-mop="asr" data-src="${s.id}" type="button">Transcribe</button>`}` : `<button class="btn btn-outline btn-sm" data-mop="relink" data-src="${s.id}" type="button">Find file…</button>`}</span></li>`).join('');
 }
 
 // ============================================================ clip operations
@@ -774,9 +774,9 @@ function renderTray() {
   $('trayList').innerHTML = jobs.map((j) => {
     const state = { queued: 'Waiting', running: `${j.label || 'Starting'} ${Math.round(j.progress * 100)}%${j.eta ? ` · ${Math.ceil(j.eta)} s left` : ''}`, ready: `Ready · ${j.size}`, failed: `Failed: ${esc(j.error)}`, cancelled: 'Cancelled' }[j.state];
     const acts = [];
-    if (['queued', 'running'].includes(j.state)) acts.push(`<button class="link-btn" data-job="${j.id}" data-jop="cancel" type="button">Cancel</button>`);
+    if (['queued', 'running'].includes(j.state)) acts.push(`<button class="btn btn-outline btn-sm" data-job="${j.id}" data-jop="cancel" type="button">Cancel</button>`);
     if (j.state === 'ready') acts.push(`<a class="icon-btn" href="${j.url}" download="${esc(j.name)}" aria-label="Download ${esc(j.name)}" title="Download">${ICON.down}</a>`);
-    if (['failed', 'cancelled'].includes(j.state)) acts.push(`<button class="link-btn" data-job="${j.id}" data-jop="retry" type="button">Retry</button>`);
+    if (['failed', 'cancelled'].includes(j.state)) acts.push(`<button class="btn btn-outline btn-sm" data-job="${j.id}" data-jop="retry" type="button">Retry</button>`);
     if (!['queued', 'running'].includes(j.state)) acts.push(`<button class="icon-btn plain" data-job="${j.id}" data-jop="remove" type="button" aria-label="Remove from list" title="Remove">✕</button>`);
     return `<li class="job ${j.state}"><span class="job-name" title="${esc(j.name)}">${esc(j.name)}</span><span class="job-acts">${acts.join('')}</span><span class="job-state">${state}</span>${j.state === 'running' ? `<span class="pp-bar"><i style="width:${Math.round(j.progress * 100)}%"></i></span>` : ''}</li>`;
   }).join('');
