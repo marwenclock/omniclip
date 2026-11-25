@@ -141,6 +141,8 @@ function drawPop(ctx, W, H, style, groups, t) {
     x += (rtl ? -1 : 1) * (ww + space);
   });
   ctx.restore();
+  const pad = size * 0.4;
+  return { x: (W - width) / 2 - pad, y: y - size * 0.75, w: width + pad * 2, h: size * 1.5 };
 }
 
 function drawClassic(ctx, W, H, style, words, t) {
@@ -173,6 +175,7 @@ function drawClassic(ctx, W, H, style, words, t) {
     ctx.fillText(l, W / 2, yy);
   });
   ctx.restore();
+  return { x: (W - boxW) / 2, y: y - boxH / 2, w: boxW, h: boxH };
 }
 
 // ---------- title card ----------
@@ -197,7 +200,7 @@ function drawTitle(ctx, W, H, style, title, alpha) {
   ctx.textBaseline = 'middle';
   lines.forEach((l, k) => ctx.fillText(l, W / 2, y0 + size * 0.35 + lh * (k + 0.5)));
   ctx.restore();
-  return { top: y0, bottom: y0 + boxH };
+  return { top: y0, bottom: y0 + boxH, x: (W - boxW) / 2, y: y0, w: boxW, h: boxH };
 }
 
 // ---------- audiogram (audio-only sources) ----------
@@ -208,12 +211,16 @@ function drawAudiogram(ctx, W, H, style, title, levels) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
   const size = Math.round(Math.min(W, H * 0.5625) * 0.075);
+  let titleBox = null;
   if (title && style.title !== 'none') {
     ctx.font = `800 ${size}px ${FONTS.sans}`;
     ctx.fillStyle = '#fff';
     ctx.textBaseline = 'top';
     ctx.textAlign = 'center';
-    wrap(ctx, title, W * 0.84).slice(0, 3).forEach((l, i) => ctx.fillText(l, W / 2, H * 0.16 + i * size * 1.2));
+    const lines = wrap(ctx, title, W * 0.84).slice(0, 3);
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, H * 0.16 + i * size * 1.2));
+    const tw = Math.max(...lines.map((l) => ctx.measureText(l).width));
+    titleBox = { x: (W - tw) / 2 - size * 0.3, y: H * 0.16 - size * 0.2, w: tw + size * 0.6, h: lines.length * size * 1.2 + size * 0.3 };
     ctx.textAlign = 'left';
   }
   const n = 28, bw = (W * 0.8) / n, cy = H * 0.47;
@@ -224,6 +231,7 @@ function drawAudiogram(ctx, W, H, style, title, levels) {
     roundRect(ctx, W * 0.1 + i * bw + bw * 0.2, cy - h / 2, bw * 0.6, h, bw * 0.3);
     ctx.fill();
   }
+  return { titleBox, bars: { x: W * 0.08, y: cy - H * 0.09, w: W * 0.84, h: H * 0.18 } };
 }
 
 // ---------- source framing ----------
@@ -294,6 +302,7 @@ function drawOverlay(ctx, W, H, ov, el, seqT) {
   ctx.globalAlpha = ov.opacity ?? 1;
   ctx.drawImage(el, (W - w) * (ov.x ?? 0.95), (H - h) * (ov.y ?? 0.05), w, h);
   ctx.restore();
+  return { x: (W - w) * (ov.x ?? 0.95), y: (H - h) * (ov.y ?? 0.05), w, h };
 }
 
 // ---------- safe-area guides (monitor only, never exported) ----------
@@ -318,21 +327,34 @@ function drawGuides(ctx, W, H, style, titleBox) {
 // f = { media, mw, mh, st (source time), seqT (time since the short began), dur (short length),
 //       style, title, words, groups, levels, follow (t -> pos | null), overlay, overlayEl, guides }
 export function compose(ctx, W, H, f) {
-  const style = f.style;
+  // f.hits (optional array) collects what was drawn where, bottom layer first, so the
+  // monitor can let people click an element to edit it. Exports leave it out.
+  const style = f.style, hits = f.hits;
+  const hit = (kind, b) => { if (hits && b && b.w > 0 && b.h > 0) hits.push({ kind, ...b }); };
   ctx.save();
   noFx(ctx);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
-  if (!f.media || !f.mw) drawAudiogram(ctx, W, H, style, f.title, f.levels);
-  else drawMedia(ctx, W, H, f.media, f.mw, f.mh, style, style.layout === 'auto' && f.follow ? f.follow(f.st) : style.pos);
-  drawOverlay(ctx, W, H, f.overlay, f.overlayEl, f.seqT);
-  if (style.captions === 'pop') drawPop(ctx, W, H, style, f.groups || [], f.st);
-  else if (style.captions === 'classic') drawClassic(ctx, W, H, style, f.words || [], f.st);
+  hit('frame', { x: 0, y: 0, w: W, h: H });
+  if (!f.media || !f.mw) {
+    const ag = drawAudiogram(ctx, W, H, style, f.title, f.levels);
+    hit('audio', ag.bars); hit('title', ag.titleBox);
+  } else drawMedia(ctx, W, H, f.media, f.mw, f.mh, style, style.layout === 'auto' && f.follow ? f.follow(f.st) : style.pos);
+  hit('overlay', drawOverlay(ctx, W, H, f.overlay, f.overlayEl, f.seqT));
+  let cap = null;
+  if (style.captions === 'pop') cap = drawPop(ctx, W, H, style, f.groups || [], f.st);
+  else if (style.captions === 'classic') cap = drawClassic(ctx, W, H, style, f.words || [], f.st);
+  if (style.captions !== 'none' && f.words?.length) {
+    // between words nothing is drawn, so keep the caption's band clickable
+    const sz = Math.min(W, H * 0.5625) * 0.085 * style.size;
+    hit('caption', cap || { x: W * 0.15, y: H * style.y - sz * 0.75, w: W * 0.7, h: sz * 1.5 });
+  }
   let titleBox = null;
   if (f.mw && style.title !== 'none') {
     const fade = f.dur ? Math.min(1, Math.max(0, f.dur - f.seqT) * 4) : 1; // never flash the title at the very end
     const alpha = style.title === 'always' ? 1 : Math.max(0, Math.min(1, style.titleDur + 0.5 - f.seqT));
     titleBox = drawTitle(ctx, W, H, style, f.title, Math.min(alpha, style.title === 'always' ? 1 : fade));
+    hit('title', titleBox);
   }
   if (f.guides) drawGuides(ctx, W, H, style, titleBox || (style.title !== 'none' && f.title ? { top: H * style.titleY, bottom: H * style.titleY + H * 0.06 } : null));
   ctx.restore();

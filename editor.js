@@ -219,12 +219,201 @@ function queueThumb(c, el) {
 // ---------- selection ----------
 export function selectClip(id, { play = false, quiet: q = false } = {}) {
   pause();
-  R.selId = id; R.ri = 0; R.playT = 0;
+  R.selId = id; R.ri = 0; R.playT = 0; closeEl();
   document.body.classList.remove('bin-open');
   renderAll({ type: 'select' });
   const c = selClip();
   if (c) { goTo(0, play); highlightTranscript(true); }
   if (!q && c) setStatus(`${c.name} · ${tc(clipDuration(c))}`);
+}
+
+// ============================================================ click-to-edit on the Output monitor
+// compose() reports where it drew each element; clicking one opens a floating dock
+// above it with quick settings and opens (and glows) its section in the inspector.
+// Captions, the title and overlays can be dragged to move them.
+const EL = {
+  caption: { name: 'Captions', tab: 'itCaptions', glow: () => qs('input[name="st-captions"]')?.closest('.field') },
+  title: { name: 'Title', tab: 'itTrim', glow: () => $('clipTitle').closest('.field') },
+  overlay: { name: 'Overlay', tab: 'itFrame', glow: () => $('ovAdd').closest('.field') || $('ovAdd').parentElement },
+  audio: { name: 'Audio', tab: 'itAudio', glow: () => qs('[data-style="gain"]').closest('.field') },
+  frame: { name: 'Frame', tab: 'itFrame', glow: () => qs('input[name="st-layout"]')?.closest('.field') },
+};
+const SV = (d) => `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const EI = {
+  minus: SV('<path d="M5 10h10"/>'), plus: SV('<path d="M10 5v10M5 10h10"/>'),
+  style: SV('<path d="M4 16 10 4l6 12M6.5 11.5h7"/>'), words: SV('<path d="M3 7h5M10 7h7M3 13h8M13 13h4"/>'),
+  case: SV('<path d="M2.5 15 6 5l3.5 10M3.6 12h4.8M13 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM15.5 9v6"/>'),
+  hide: SV('<path d="M3 3l14 14M8.6 5.2A7.8 7.8 0 0 1 10 5c4.5 0 7.5 5 7.5 5a13 13 0 0 1-2.4 2.9M5.6 6.6C3.6 8 2.5 10 2.5 10s3 5 7.5 5c1.2 0 2.3-.3 3.3-.8M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5"/>'),
+  more: SV('<path d="M3.5 5h13M3.5 10h13M3.5 15h8"/>'), close: SV('<path d="M5 5l10 10M15 5 5 15"/>'),
+  edit: SV('<path d="M4 16h3l8.5-8.5a2.1 2.1 0 0 0-3-3L4 13z"/>'), clock: SV('<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>'),
+  opacity: SV('<circle cx="10" cy="10" r="7"/><path d="M10 3v14" /><path d="M10 6h4M10 10h7M10 14h4"/>'),
+  trash: SV('<path d="M4 6h12M8 6V4h4v2M5.8 6l.9 10.5h6.6L14.2 6"/>'), mute: SV('<path d="M3.5 8h3l4-3.5v11l-4-3.5h-3zM14 8l4 4M18 8l-4 4"/>'),
+  vol: SV('<path d="M3.5 8h3l4-3.5v11l-4-3.5h-3zM14 7.5a3.5 3.5 0 0 1 0 5"/>'), fade: SV('<path d="M3 15c5 0 9-10 14-10"/>'),
+  layout: SV('<rect x="5" y="2.5" width="10" height="15" rx="2"/><path d="M2.5 7v6M17.5 7v6"/>'), flip: SV('<path d="M10 2.5v15M7 5 3 14h4zM13 5l4 9h-4z"/>'),
+  rotate: SV('<path d="M15.5 8A6 6 0 1 0 16 12M16 4v4h-4"/>'), color: SV('<circle cx="10" cy="10" r="7"/>'),
+};
+const LAYOUTS = [['auto', 'Follow'], ['crop', 'Fixed'], ['blur', 'Blur'], ['fit', 'Fit']];
+const tool = (q, icon, label, extra = '') => `<button class="tool" type="button" data-q="${q}" ${extra}>${icon}<span>${label}</span></button>`;
+const itool = (q, icon, label) => `<button class="tool icon" type="button" data-q="${q}" aria-label="${label}" title="${label}">${icon}</button>`;
+const sep = '<span class="dock-sep"></span>';
+function elDockHTML(kind, c) {
+  const s = effStyle(c), pct = (v) => `${Math.round(v * 100)}%`;
+  const head = `<b class="el-name">${EL[kind].name}</b>`;
+  const tail = `${sep}${itool('more', EI.more, 'All settings')}${itool('close', EI.close, 'Close')}`;
+  if (kind === 'caption') return `${head}${sep}${itool('size-', EI.minus, 'Smaller')}<span class="el-val">${pct(s.size)}</span>${itool('size+', EI.plus, 'Bigger')}${sep}`
+    + tool('preset', EI.style, PRESETS[Object.keys(PRESETS).find((k) => PRESETS[k].hi === s.hi && PRESETS[k].font === s.font && PRESETS[k].captions === s.captions)]?.label || 'Style')
+    + tool('words', EI.words, `${s.words} words`) + tool('case', EI.case, s.case === 'upper' ? 'CAPS' : 'Aa')
+    + `<label class="tool" title="Highlight colour"><input type="color" data-q="hi" value="${s.hi}" class="el-color">${EI.color}<span>Colour</span></label>`
+    + itool('hide', EI.hide, 'Turn captions off') + tail;
+  if (kind === 'title') return `${head}${sep}${tool('edit', EI.edit, 'Edit text')}${tool('tmode', EI.clock, s.title === 'always' ? 'Always' : 'Intro only')}${itool('hide', EI.hide, 'Hide the title')}${tail}`;
+  if (kind === 'overlay') return `${head}${sep}${itool('ow-', EI.minus, 'Smaller')}<span class="el-val">${pct(c.overlay.w)}</span>${itool('ow+', EI.plus, 'Bigger')}${sep}${tool('oop', EI.opacity, `${pct(c.overlay.opacity ?? 1)} opacity`)}${itool('orm', EI.trash, 'Remove overlay')}${tail}`;
+  if (kind === 'audio') return `${head}${sep}${itool('gain-', EI.minus, 'Quieter')}<span class="el-val">${s.mute ? 'Muted' : `${s.gain > 0 ? '+' : ''}${s.gain} dB`}</span>${itool('gain+', EI.plus, 'Louder')}${sep}${tool('mute', s.mute ? EI.vol : EI.mute, s.mute ? 'Unmute' : 'Mute')}${tool('fade', EI.fade, s.fadeIn ? `Fades ${s.fadeIn}s` : 'Add fades')}${tail}`;
+  return `${head}${sep}${tool('layout', EI.layout, (LAYOUTS.find((l) => l[0] === s.layout) || LAYOUTS[0])[1])}${itool('zoom-', EI.minus, 'Zoom out')}<span class="el-val">${s.zoom.toFixed(2)}×</span>${itool('zoom+', EI.plus, 'Zoom in')}${sep}${tool('flip', EI.flip, 'Flip')}${tool('rotate', EI.rotate, 'Rotate')}${tail}`;
+}
+const toCss = (b) => {
+  const cv = $('out'), [W, H] = R.hitWH || [1, 1];
+  const k = Math.min(cv.clientWidth / W, cv.clientHeight / H), ox = (cv.clientWidth - W * k) / 2, oy = (cv.clientHeight - H * k) / 2;
+  return { x: ox + b.x * k, y: oy + b.y * k, w: b.w * k, h: b.h * k, k, ox, oy };
+};
+function hitAt(e) {
+  if (!R.hits?.length) return null;
+  const cv = $('out'), r = cv.getBoundingClientRect(), [W, H] = R.hitWH;
+  const k = Math.min(r.width / W, r.height / H), x = (e.clientX - r.left - (r.width - W * k) / 2) / k, y = (e.clientY - r.top - (r.height - H * k) / 2) / k;
+  if (x < 0 || y < 0 || x > W || y > H) return null;
+  for (let i = R.hits.length - 1; i >= 0; i--) { const h = R.hits[i]; if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return { ...h, px: x, py: y }; }
+  return null;
+}
+const boxOf = (kind) => R.hits?.findLast?.((h) => h.kind === kind) || null;
+function setBox(el, b) {
+  if (!b) { el.hidden = true; return; }
+  const c = toCss(b);
+  Object.assign(el.style, { left: `${c.x}px`, top: `${c.y}px`, width: `${c.w}px`, height: `${c.h}px` });
+  el.hidden = false;
+}
+function placeElUI() {
+  const kind = R.elSel;
+  if (!kind) return;
+  const b = boxOf(kind) || R.elLast;
+  if (!b) return;
+  R.elLast = b;
+  setBox($('elSel'), kind === 'frame' ? null : b);
+  const dock = $('elDock'), stage = $('stage'), c = toCss(b);
+  const dw = dock.offsetWidth, dh = dock.offsetHeight;
+  let top = kind === 'frame' ? c.oy + 12 : c.y - dh - 10;
+  if (top < 8) top = Math.min(stage.clientHeight - dh - 8, c.y + c.h + 10);
+  const left = Math.max(8, Math.min(stage.clientWidth - dw - 8, c.x + c.w / 2 - dw / 2));
+  dock.style.left = `${left}px`; dock.style.top = `${Math.max(8, top)}px`;
+}
+function renderElDock() {
+  const c = selClip(); if (!c || !R.elSel) return;
+  if (R.elSel === 'overlay' && !c.overlay) { closeEl(); return; }
+  const dock = $('elDock');
+  if (document.activeElement?.classList.contains('el-color')) { placeElUI(); return; } // keep the colour picker open
+  const focused = dock.contains(document.activeElement) ? document.activeElement.dataset.q : null;
+  dock.innerHTML = elDockHTML(R.elSel, c);
+  dock.hidden = false;
+  if (focused) dock.querySelector(`[data-q="${focused}"]`)?.focus();
+  placeElUI();
+}
+function closeEl() { R.elSel = null; R.elLast = null; ['elDock', 'elSel', 'elHover'].forEach((id) => { if ($(id)) $(id).hidden = true; }); }
+function glowInspector(kind) {
+  showInspTab(EL[kind].tab);
+  const target = EL[kind].glow?.();
+  const insp = $('inspector');
+  insp.classList.remove('glow'); void insp.offsetWidth; insp.classList.add('glow');
+  if (target) {
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    target.classList.remove('glow-field'); void target.offsetWidth; target.classList.add('glow-field');
+  }
+}
+function openEl(kind) {
+  R.elSel = kind; R.elLast = boxOf(kind);
+  renderElDock();
+  glowInspector(kind);
+  $('elHover').hidden = true;
+}
+function elAction(q, val) {
+  const c = selClip(); if (!c) return;
+  const s = effStyle(c), clamp = (v, a, b) => Math.max(a, Math.min(b, v)), r2 = (v) => Math.round(v * 100) / 100;
+  const ov = (k, v) => tx('adjust overlay', (p) => { clipById(p, c.id).overlay[k] = v; }, `ov:${k}:${c.id}`);
+  switch (q) {
+    case 'size-': case 'size+': setStyle('size', r2(clamp(s.size + (q === 'size+' ? 0.1 : -0.1), 0.5, 1.8)), 'caption size'); break;
+    case 'preset': {
+      const keys = Object.keys(PRESETS), cur = keys.findIndex((k) => PRESETS[k].hi === s.hi && PRESETS[k].font === s.font && PRESETS[k].captions === s.captions);
+      const p = PRESETS[keys[(cur + 1) % keys.length]];
+      tx(`apply preset ${p.label}`, (pp) => { const cc = clipById(pp, c.id); for (const k of CAPTION_KEYS) if (k in p && k !== 'y') cc.style[k] = p[k]; });
+      announce(`Caption style: ${p.label}`); break;
+    }
+    case 'words': { const opts = [1, 2, 3, 4, 6, 8]; setStyle('words', opts[(opts.indexOf(s.words) + 1) % opts.length] || 3, 'words per caption', false); break; }
+    case 'case': setStyle('case', s.case === 'upper' ? 'none' : 'upper', 'caption case', false); break;
+    case 'hi': setStyle('hi', val, 'highlight colour'); break;
+    case 'hide': setStyle(R.elSel === 'title' ? 'title' : 'captions', 'none', R.elSel === 'title' ? 'hide title' : 'captions off', false);
+      announce(R.elSel === 'title' ? 'Title hidden. Turn it back on in Trim.' : 'Captions off. Turn them back on in Captions.'); glowInspector(R.elSel); closeEl(); break;
+    case 'edit': glowInspector('title'); $('clipTitle').focus(); $('clipTitle').select(); break;
+    case 'tmode': setStyle('title', s.title === 'always' ? 'intro' : 'always', 'title card', false); break;
+    case 'ow-': case 'ow+': ov('w', r2(clamp((c.overlay.w || 0.3) + (q === 'ow+' ? 0.05 : -0.05), 0.05, 1))); break;
+    case 'oop': { const o = [1, 0.75, 0.5, 0.25], i = o.indexOf(c.overlay.opacity ?? 1); ov('opacity', o[(i + 1) % o.length]); break; }
+    case 'orm': tx('remove overlay', (p) => { clipById(p, c.id).overlay = null; }); closeEl(); break;
+    case 'gain-': case 'gain+': setStyle('gain', clamp(s.gain + (q === 'gain+' ? 1.5 : -1.5), -18, 12), 'volume'); break;
+    case 'mute': setStyle('mute', !s.mute, s.mute ? 'unmute' : 'mute', false); break;
+    case 'fade': { const f = s.fadeIn ? (s.fadeIn >= 1 ? 0 : 1) : 0.5; tx('fades', (p) => { const cc = clipById(p, c.id); cc.style.fadeIn = f; cc.style.fadeOut = f; }); break; }
+    case 'layout': { const i = LAYOUTS.findIndex((l) => l[0] === s.layout); setStyle('layout', LAYOUTS[(i + 1) % LAYOUTS.length][0], 'layout', false); break; }
+    case 'zoom-': case 'zoom+': setStyle('zoom', r2(clamp(s.zoom + (q === 'zoom+' ? 0.1 : -0.1), 1, 3)), 'zoom'); break;
+    case 'flip': setStyle('flip', !s.flip, 'flip', false); break;
+    case 'rotate': setStyle('rotate', ((s.rotate || 0) + 90) % 360, 'rotate', false); break;
+    case 'more': glowInspector(R.elSel); break;
+    case 'close': closeEl(); break;
+  }
+}
+function wireElements() {
+  const cv = $('out'), dock = $('elDock');
+  let press = null;
+  cv.addEventListener('pointerdown', (e) => {
+    if (R.view !== 'output' || e.button !== 0) return;
+    const h = hitAt(e); if (!h) return;
+    const c = selClip(); if (!c) return;
+    const s = effStyle(c);
+    press = { kind: h.kind, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, s, ov: c.overlay && { ...c.overlay }, k: toCss(h).k, H: R.hitWH[1], W: R.hitWH[0], box: h };
+    try { cv.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!press) {
+      if (R.view !== 'output' || e.pointerType === 'touch') return;
+      const h = hitAt(e);
+      cv.style.cursor = h && ['caption', 'title', 'overlay'].includes(h.kind) ? 'move' : h ? 'pointer' : '';
+      setBox($('elHover'), h && h.kind !== 'frame' && h.kind !== R.elSel ? h : null);
+      return;
+    }
+    const dx = (e.clientX - press.x) / press.k, dy = (e.clientY - press.y) / press.k;
+    if (!press.moved && Math.hypot(dx, dy) * press.k < 5) return;
+    press.moved = true;
+    const c = selClip(); if (!c) return;
+    if (press.kind === 'caption') setStyle('y', Math.round(Math.max(0.15, Math.min(0.92, press.s.y + dy / press.H)) * 1000) / 1000, 'move captions');
+    else if (press.kind === 'title') setStyle('titleY', Math.round(Math.max(0.02, Math.min(0.8, press.s.titleY + dy / press.H)) * 1000) / 1000, 'move title');
+    else if (press.kind === 'overlay' && press.ov) {
+      const w = press.box.w, h = press.box.h;
+      const nx = press.W - w > 0 ? Math.max(0, Math.min(1, press.ov.x + dx / (press.W - w))) : press.ov.x;
+      const ny = press.H - h > 0 ? Math.max(0, Math.min(1, press.ov.y + dy / (press.H - h))) : press.ov.y;
+      tx('move overlay', (p) => { const o = clipById(p, c.id).overlay; o.x = Math.round(nx * 1000) / 1000; o.y = Math.round(ny * 1000) / 1000; }, `ovmove:${c.id}`);
+    }
+  });
+  const end = (e) => {
+    if (!press) return;
+    const p = press; press = null;
+    if (p.moved) { endGesture(); if (R.elSel !== p.kind) openEl(p.kind); else renderElDock(); return; }
+    if (e.type === 'pointercancel') return;
+    if (R.elSel === p.kind) { if (p.kind === 'frame') closeEl(); return; } // a second click on the picture closes it
+    openEl(p.kind);
+  };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+  cv.addEventListener('pointerleave', () => { if (!press) $('elHover').hidden = true; });
+  dock.addEventListener('click', (e) => { const b = e.target.closest('button[data-q]'); if (b) elAction(b.dataset.q); });
+  dock.addEventListener('input', (e) => { if (e.target.dataset.q === 'hi') elAction('hi', e.target.value); });
+  dock.addEventListener('change', () => endGesture());
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && R.elSel && !document.querySelector('dialog[open]')) closeEl(); });
+  onChange(() => { if (R.elSel) renderElDock(); });
+  new ResizeObserver(() => placeElUI()).observe($('stage'));
 }
 
 // ============================================================ monitor and playback
@@ -295,8 +484,14 @@ function loop() {
 function renderTransport() {
   const c = selClip(), v = player();
   const playing = R.view === 'source' ? !v.paused : R.playing;
-  $('playBtn').innerHTML = playing ? ICON.pause : ICON.play;
-  $('playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  // Only swap the icon when the state changes: rewriting it every frame ate clicks
+  // that landed between mousedown and mouseup.
+  const pb = $('playBtn');
+  if (pb.dataset.state !== (playing ? 'pause' : 'play')) {
+    pb.dataset.state = playing ? 'pause' : 'play';
+    pb.innerHTML = playing ? ICON.pause : ICON.play;
+    pb.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
   if (R.view === 'source') { $('tcNow').textContent = tc(v.currentTime); $('tcDur').textContent = `/ ${tc(v.duration || 0)}`; }
   else { $('tcNow').textContent = tc(R.playT); $('tcDur').textContent = `/ ${tc(c ? clipDuration(c) : 0)}`; }
   tl?.setTime(R.view === 'source' ? sourceTimeToSeq(v.currentTime) : R.playT);
@@ -340,8 +535,10 @@ function draw() {
   compose(ctx, W, H, {
     media: ready && v.videoWidth ? v : null, mw: v.videoWidth, mh: v.videoHeight, st, seqT: R.playT, dur: clipDuration(c),
     style, title: c.title, words, groups, levels: null, follow: R.follow[followKey(c, r)] || null,
-    overlay: c.overlay, overlayEl: ovEl, guides: $('guides').checked,
+    overlay: c.overlay, overlayEl: ovEl, guides: $('guides').checked, hits: (R.hits = []),
   });
+  R.hitWH = [W, H];
+  placeElUI();
 }
 function overlayEl(ov) {
   const id = ov.asset;
@@ -368,6 +565,7 @@ function setView(view) {
   stage.classList.toggle('view-source', view === 'source');
   player().controls = view === 'source';
   qs('.src-only').hidden = view !== 'source';
+  if (view !== 'output') closeEl();
   pause();
   if (view === 'output') goTo(R.playT); else { player().volume = 1; layoutCrop(); }
   renderTransport(); requestDraw();
@@ -946,6 +1144,7 @@ function wire() {
   // monitor
   qsa('input[name="view"]').forEach((r) => (r.onchange = () => setView(r.value)));
   $('playBtn').onclick = togglePlay;
+  wireElements();
   $('guides').onchange = requestDraw;
   const v = player();
   v.addEventListener('timeupdate', () => { if (R.view === 'source') renderTransport(); });

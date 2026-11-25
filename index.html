@@ -224,6 +224,9 @@
       <div class="stage" id="stage">
         <video id="player" playsinline preload="auto"></video>
         <canvas id="out" aria-label="Output preview of the selected clip"></canvas>
+        <div class="el-box hover" id="elHover" hidden></div>
+        <div class="el-box sel" id="elSel" hidden></div>
+        <div class="dock row el-dock" id="elDock" role="toolbar" aria-label="Edit the selected element" hidden></div>
         <div class="crop" id="crop" hidden>
           <button class="crop-handle" id="cropHandle" type="button" title="Drag to choose what stays in the frame">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6 2 10l4 4M14 6l4 4-4 4M2 10h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -242,7 +245,7 @@
         <div class="dock">
           <div class="dock-group play-group">
             <button class="play" id="playBtn" type="button" aria-label="Play" title="Play / pause (Space)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10l8-5z" fill="currentColor"/></svg></button>
-            <span class="tc"><span class="tc-now" id="tcNow">0:00.0</span><span class="tc-dur" id="tcDur">/ 0:00.0</span></span>
+            <span class="tcode"><span class="tc-now" id="tcNow">0:00.0</span><span class="tc-dur" id="tcDur">/ 0:00.0</span></span>
           </div>
           <span class="src-only dock-group" hidden>
             <span class="dock-sep"></span>
