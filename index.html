@@ -92,28 +92,34 @@
     <input type="file" id="subFile" accept=".srt,.vtt,text/vtt,application/x-subrip" class="sr-only" tabindex="-1" aria-hidden="true">
     <input type="file" id="ovFile" accept="image/*,video/*" class="sr-only" tabindex="-1" aria-hidden="true">
 
-    <details class="settings" id="settings">
-      <summary><span>Create shorts settings</span> <span class="settings-sum" id="settingsSum"></span></summary>
-      <div class="pills" id="options">
-        <label class="pill-select"><span>Shorts</span>
-          <select id="count"><option value="auto" selected>Auto</option><option>3</option><option>5</option><option>8</option><option>12</option><option>20</option></select>
-        </label>
-        <label class="pill-select"><span>Language</span>
-          <select id="lang">
-            <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
-            <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ar">Arabic</option>
-          </select>
-        </label>
-        <label class="pill-select"><span>Picking</span>
-          <select id="finder"><option value="smart">Smart</option><option value="deep">Deep</option><option value="instant">Instant</option></select>
-        </label>
-        <label class="pill-select"><span>Accuracy</span>
-          <select id="quality"><option value="fast">Fast</option><option value="better">Better</option><option value="best">Best</option></select>
-        </label>
+    <section class="settings" id="settings" aria-label="Create shorts settings">
+      <button class="settings-toggle" id="settingsToggle" type="button" aria-expanded="false" aria-controls="settingsPanel">
+        <svg class="st-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h8M15 6h1.5M3.5 14h2M9 14h7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="13.2" cy="6" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7.2" cy="14" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span class="st-text"><span class="st-title">Create shorts settings</span><span class="st-tags" id="settingsSum"></span></span>
+        <span class="st-action"><span class="st-verb" id="settingsVerb">Change</span><svg class="st-chev" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </button>
+      <div class="settings-panel" id="settingsPanel" hidden>
+        <div class="settings-grid" id="options">
+          <label class="sfield"><span class="sf-label">Number of shorts</span>
+            <select id="count"><option value="auto" selected>Auto (about 1 per 2 min)</option><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="12">12</option><option value="20">20</option></select>
+          </label>
+          <label class="sfield"><span class="sf-label">Spoken language</span>
+            <select id="lang">
+              <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+              <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ar">Arabic</option>
+            </select>
+          </label>
+          <label class="sfield"><span class="sf-label">Moment picking</span>
+            <select id="finder"><option value="smart">Smart · AI, 1 GB once</option><option value="deep">Deep · AI, 2.2 GB once</option><option value="instant">Instant · no download</option></select>
+          </label>
+          <label class="sfield"><span class="sf-label">Transcription</span>
+            <select id="quality"><option value="fast">Fast · 200 MB once</option><option value="better">Better · 600 MB once</option><option value="best">Best · 1.6 GB once</option></select>
+          </label>
+        </div>
+        <p class="opt-help" id="optHelp"></p>
+        <p class="opt-warn" id="optWarn" hidden><span></span><button class="link-btn" type="button"></button></p>
       </div>
-      <p class="opt-help" id="optHelp"></p>
-      <p class="opt-warn" id="optWarn" hidden><span></span><button class="link-btn" type="button"></button></p>
-    </details>
+    </section>
     <p class="gpu-note" id="gpuNote" hidden></p>
     <p class="gpu-note" id="exportNote" hidden></p>
     <p class="start-links"><button class="link-btn" id="trySample" type="button">Try a sample podcast</button> · <button class="link-btn" id="openProj" type="button">Open a project file</button></p>

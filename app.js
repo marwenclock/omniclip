@@ -48,12 +48,13 @@ function loadOptions() {
 }
 function explainOptions() {
   const n = $('count').value;
-  const countHelp = n === 'auto' ? 'Auto shorts: about one per 2 minutes of video.' : +n >= 8 ? `${n} shorts suits videos longer than about ${n * 2} minutes.` : '';
+  const countHelp = +n >= 8 ? ` ${n} shorts suits videos longer than about ${n * 2} minutes.` : '';
   const eff = gpuChecked && !hasGPU ? 'instant' : finder();
   const deviceNote = gpuChecked && !hasGPU ? ' (this browser can’t use the graphics card, so Smart and Deep aren’t available here)' : '';
   const langNote = $('lang').value !== 'en' ? ' Moment picking is tuned for English, so check the picks or choose lines yourself.' : '';
-  $('optHelp').textContent = `${FINDER_HELP[eff]}${deviceNote}. ${QUALITY_HELP[$('quality').value]} ${countHelp}${langNote}`;
-  $('settingsSum').textContent = `· ${n === 'auto' ? 'Auto count' : `${n} shorts`} · ${LANGS[$('lang').value]} · ${eff[0].toUpperCase() + eff.slice(1)} picking · ${$('quality').selectedOptions[0].text} accuracy`;
+  $('optHelp').textContent = `${FINDER_HELP[eff]}${deviceNote}. Downloads happen once and stay on this device.${countHelp}${langNote}`;
+  const tags = [n === 'auto' ? 'Auto count' : `${n} shorts`, LANGS[$('lang').value], `${eff[0].toUpperCase() + eff.slice(1)} picking`, `${$('quality').value[0].toUpperCase() + $('quality').value.slice(1)} transcription`];
+  $('settingsSum').innerHTML = tags.map((t) => `<span class="st-tag">${esc(t)}</span>`).join('');
   let warn = null;
   if (gpu.weak && finder() === 'deep') warn = { text: `Your computer has ${gpu.name}, so Deep picking will be very slow.`, fix: 'Use Smart', apply: () => { $('finder').value = 'smart'; } };
   else if (gpu.weak && $('quality').value === 'best') warn = { text: `Your computer has ${gpu.name}, so Best accuracy will be very slow.`, fix: 'Use Better', apply: () => { $('quality').value = 'better'; } };
@@ -65,6 +66,16 @@ function explainOptions() {
   }
 }
 qsa('#options select').forEach((el) => el.addEventListener('change', saveOptions));
+// Settings open/close: a real button with a clear state, remembered on this device.
+function setSettingsOpen(open) {
+  $('settingsPanel').hidden = !open;
+  $('settingsToggle').setAttribute('aria-expanded', String(open));
+  $('settings').classList.toggle('open', open);
+  $('settingsVerb').textContent = open ? 'Done' : 'Change';
+  localStorage.setItem('omniclip:settingsOpen', open ? '1' : '0');
+}
+$('settingsToggle').onclick = () => setSettingsOpen($('settingsPanel').hidden);
+setSettingsOpen(localStorage.getItem('omniclip:settingsOpen') === '1');
 loadOptions();
 const gpuReady = (async () => {
   const adapter = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
