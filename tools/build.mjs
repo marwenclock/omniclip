@@ -119,6 +119,7 @@ function renderPage(pg) {
 <meta name="theme-color" content="#0a0a0a">
 <meta name="color-scheme" content="dark">
 <link rel="canonical" href="${url}">
+<link rel="alternate" type="text/markdown" href="/${pg.slug}/index.md">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="OMNICLIP">
 <meta property="og:title" content="${esc(pg.title)}">
@@ -164,6 +165,51 @@ for (const pg of PAGES) {
   writeFileSync(join(OUT, pg.slug, 'index.html'), renderPage(pg));
 }
 
+// ---------- Markdown copies for AI agents ----------
+// /index.md and /<slug>/index.md. A Cloudflare URL-rewrite rule serves them to requests that send
+// "Accept: text/markdown" (Markdown negotiation); pages also point to them with rel="alternate".
+const md = (h) => String(h)
+  .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (_, href, t) => `[${t}](${href.startsWith('/') ? SITE + href : href})`)
+  .replace(/<\/?b>/g, '**').replace(/<sup>([^<]*)<\/sup>/g, ' $1').replace(/<[^>]+>/g, '')
+  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/[ \t]+/g, ' ').trim();
+function pageMd(pg) {
+  const out = [`# ${pg.h1}`, '', pg.lede, ''];
+  for (const [kind, v] of pg.body) {
+    if (kind === 'h2') out.push(`## ${v}`, '');
+    else if (kind === 'p') out.push(md(v), '');
+    else if (kind === 'ul') out.push(...v.map((x) => `- ${md(x)}`), '');
+    else if (kind === 'ol') out.push(...v.map((x, i) => `${i + 1}. ${md(x)}`), '');
+    else if (kind === 'table') { const [h, ...r] = v; out.push(`| ${h.join(' | ')} |`, `| ${h.map(() => '---').join(' | ')} |`, ...r.map((x) => `| ${x.join(' | ')} |`), ''); }
+    else if (kind === 'faq') { out.push('## Questions', ''); for (const [q, a] of v) out.push(`### ${q}`, '', md(a), ''); }
+    else if (kind === 'cta') out.push(`[Open OMNICLIP, free, in your browser](${SITE}/)`, '');
+  }
+  out.push('---', '', `Source: ${SITE}/${pg.slug}/ · OMNICLIP by BANKASI MEDIA`, '');
+  return out.join('\n');
+}
+for (const pg of PAGES) writeFileSync(join(OUT, pg.slug, 'index.md'), pageMd(pg));
+
+// homepage: convert the crawlable .learn section of index.html (controlled markup, so simple rules suffice)
+{
+  const learn = index.slice(index.indexOf('<div class="learn">'), index.indexOf('<footer class="site-foot">'));
+  if (learn.length < 500) throw new Error('build: .learn section not found in index.html');
+  const lede = md(index.match(/<p class="lede">([\s\S]*?)<\/p>/)[1]);
+  const body = learn
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/g, (_, t) => `\n## ${md(t)}\n\n`)
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/g, (_, t) => `\n### ${md(t)}\n\n`)
+    .replace(/<summary>([\s\S]*?)<\/summary>/g, (_, t) => `\n### ${md(t)}\n\n`)
+    .replace(/<tr>([\s\S]*?)<\/tr>/g, (_, r) => `| ${[...r.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((c) => md(c[1]) || ' ').join(' | ')} |\n`)
+    .replace(/<\/thead>/g, '| --- | --- | --- |\n')
+    .replace(/<ol class="steps">([\s\S]*?)<\/ol>/g, (_, l) => [...l.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m, i) => `${i + 1}. ${md(m[1])}`).join('\n') + '\n\n')
+    .replace(/<li>([\s\S]*?)<\/li>/g, (_, t) => `- ${md(t)}\n`)
+    .replace(/<p>([\s\S]*?)<\/p>/g, (_, t) => `${md(t)}\n\n`)
+    .replace(/<[^>]+>/g, '')
+    .split('\n').map((l) => l.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim()
+    .replace(/^((?:\||- ).*)\n\n(?=\||- )/gm, '$1\n').replace(/^((?:\||- ).*)\n\n(?=\||- )/gm, '$1\n');
+  writeFileSync(join(OUT, 'index.md'), `# OMNICLIP: long video in, shorts out\n\n${lede}\n\n[Open OMNICLIP](${SITE}/): free, in your browser, nothing uploaded\n\n${body}\n\n---\n\nSource: ${SITE}/ · OMNICLIP by BANKASI MEDIA · [Privacy](${SITE}/privacy/) · [Source code](https://github.com/marwenclock/omniclip)\n`);
+}
+
 // ---------- sitemap, robots, llms.txt ----------
 const urls = [{ loc: `${SITE}/`, pri: '1.0' }, ...PAGES.map((p) => ({ loc: `${SITE}/${p.slug}/`, pri: p.slug === 'privacy' ? '0.3' : '0.8' }))];
 writeFileSync(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
@@ -206,10 +252,21 @@ ${PAGES.filter((p) => p.slug !== 'privacy').map((p) => `- [${p.h1}](${SITE}/${p.
 `);
 
 // ---------- headers (Cloudflare static assets _headers) ----------
+// IndexNow (Bing, Yandex, Seznam, Naver...): the key file proves we own the site. Ping after a deploy with
+// node tools/indexnow.mjs. The key is public by design.
+const INDEXNOW_KEY = 'ecda49c7dc8ff8482a7ede9886c37f25';
+writeFileSync(join(OUT, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
+
+// Link headers point agents at the Markdown copy, llms.txt and the sitemap (RFC 8288)
+const pageHeaders = ['/', ...PAGES.map((p) => `/${p.slug}/`)].map((path) => `${path}
+  Link: <${path}index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"; type="text/plain", </sitemap.xml>; rel="sitemap"; type="application/xml"
+  Vary: Accept
+`).join('\n');
 writeFileSync(join(OUT, '_headers'), `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
+${pageHeaders}
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 

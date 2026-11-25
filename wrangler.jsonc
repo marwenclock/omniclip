@@ -6,7 +6,8 @@
 {
   "name": "omniclip",
   "compatibility_date": "2026-11-01",
-  "workers_dev": true,
+  "workers_dev": false, // only useomniclip.com serves the site (no duplicate on workers.dev)
+  "preview_urls": false,
   "build": { "command": "node tools/build.mjs" },
   "assets": {
     "directory": "./dist",
