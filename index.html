@@ -26,218 +26,169 @@
       <svg class="logo-frame" viewBox="0 0 16 26" aria-hidden="true"><rect x="1.2" y="1.2" width="13.6" height="23.6" rx="3.4" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6.2 9.2v7.6l5.6-3.8z" fill="currentColor"/></svg><span class="sr-only">O</span><span>MNICLIP</span>
     </span>
   </a>
-  <span class="brand-sep" aria-hidden="true"></span>
   <a class="logo-by" href="https://bankasimedia.com" target="_blank" rel="noopener" title="Visit bankasimedia.com"><span class="logo-byword">by</span><span class="logo-bankasi">BANKASI</span><sup class="logo-sup">MEDIA</sup></a>
 
   <div class="top-file" id="topFile" hidden>
-    <span class="tf-icon" aria-hidden="true"></span>
     <span class="tf-name" id="fileName"></span>
     <span class="tf-meta" id="fileMeta"></span>
   </div>
 
   <nav class="top-right" aria-label="Site">
-    <button class="tb tb-text" id="newVideo" hidden>
+    <button class="tb" id="newVideo" hidden>
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span>New video</span>
     </button>
-    <a class="tb" href="#how" id="howLink" title="How it works" aria-label="How it works">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3v.4M10 13.8v.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-    </a>
-    <a class="tb" href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener" title="Open source on GitHub" aria-label="Source code on GitHub">
+    <a class="tb tb-icon" href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener" title="Open source on GitHub" aria-label="Source code on GitHub">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 1.8a8.2 8.2 0 0 0-2.6 16c.4.1.6-.2.6-.4v-1.5c-2.3.5-2.8-1-2.8-1-.4-1-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.3.9 1.3.9.7 1.3 2 .9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.7-.9-3.7-4 0-.9.3-1.6.9-2.2-.1-.2-.4-1 .1-2.2 0 0 .7-.2 2.3.9a7.8 7.8 0 0 1 4.1 0c1.6-1.1 2.3-.9 2.3-.9.5 1.2.2 2 .1 2.2.5.6.9 1.3.9 2.2 0 3.2-1.9 3.8-3.7 4 .3.3.6.8.6 1.5v2.3c0 .2.2.5.6.4A8.2 8.2 0 0 0 10 1.8z"/></svg>
     </a>
   </nav>
 </header>
 
 <main id="main">
-  <!-- ============================== start view ============================== -->
+  <!-- ============================== start ============================== -->
   <section class="start" id="setup">
-    <div class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Free shorts maker · runs on your device</p>
-        <h1>Long video in.<br>Shorts out.</h1>
-        <p class="lede">Drop a video or podcast. OMNICLIP transcribes it, finds the moments worth posting and exports vertical clips with captions, right in your browser. Nothing is uploaded.</p>
+    <h1>Long video in.<br>Shorts out.</h1>
+    <p class="lede">Drop a video or podcast. OMNICLIP finds the best moments and turns them into vertical shorts with captions, right in your browser. Nothing is uploaded.</p>
 
-        <label class="drop" id="drop" for="file">
-          <input type="file" id="file" accept="video/*,audio/*" hidden>
-          <span class="drop-tag">[drop]</span>
-          <span class="drop-title">Drop a video or podcast</span>
-          <span class="drop-sub">MP4, MOV, WebM, MP3, WAV · any length</span>
-          <span class="btn btn-primary drop-btn">Choose a file</span>
-          <span class="drop-foot" id="gpuNote">Checking your browser…</span>
-        </label>
+    <label class="drop" id="drop" for="file">
+      <input type="file" id="file" accept="video/*,audio/*" hidden>
+      <svg class="drop-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 9.4v5.2l4-2.6z" fill="currentColor"/></svg>
+      <span class="drop-title">Drop a video or podcast</span>
+      <span class="drop-sub">MP4, MOV, WebM, MP3, WAV · any length</span>
+      <span class="btn btn-solid">Choose a file</span>
+    </label>
 
-        <details class="options" id="options">
-          <summary>
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h8M15 6h1M4 14h1M8 14h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="13.5" cy="6" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6.5" cy="14" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-            Options
-            <span class="opt-summary" id="optSummary"></span>
-          </summary>
-          <div class="opt-grid">
-            <fieldset class="field">
-              <legend>Finding moments</legend>
-              <div class="seg" role="radiogroup">
-                <label><input type="radio" name="finder" value="smart" checked><span>Smart<small>AI-assisted · 1 GB once</small></span></label>
-                <label><input type="radio" name="finder" value="deep"><span>Deep<small>stronger AI · 2.2 GB · fast GPU</small></span></label>
-                <label><input type="radio" name="finder" value="instant"><span>Instant<small>no AI download</small></span></label>
-              </div>
-            </fieldset>
-            <fieldset class="field">
-              <legend>Transcription</legend>
-              <div class="seg" role="radiogroup">
-                <label><input type="radio" name="quality" value="fast" checked><span>Fast<small>200 MB once</small></span></label>
-                <label><input type="radio" name="quality" value="better"><span>Better<small>600 MB once</small></span></label>
-                <label><input type="radio" name="quality" value="best"><span>Best<small>1.6 GB · fast GPU</small></span></label>
-              </div>
-            </fieldset>
-            <label class="field">
-              <span class="legend">Spoken language</span>
-              <select id="lang">
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="pt">Portuguese</option>
-                <option value="it">Italian</option>
-                <option value="ar">Arabic</option>
-              </select>
-            </label>
-            <label class="field">
-              <span class="legend">How many shorts</span>
-              <select id="count">
-                <option>3</option><option>5</option><option selected>8</option><option>12</option><option>20</option>
-              </select>
-            </label>
-          </div>
-        </details>
-      </div>
-
-      <!-- animated sample short -->
-      <div class="hero-visual" aria-hidden="true">
-        <div class="phone">
-          <div class="phone-screen">
-            <div class="ph-scene"><span class="ph-sun"></span><span class="ph-ridge r1"></span><span class="ph-ridge r2"></span><span class="ph-subject"></span></div>
-            <div class="ph-title">The $5,000 lesson</div>
-            <div class="ph-caption" id="demoCaption"><span>NOBODY</span> <span>TELLS</span> <span>YOU</span></div>
-            <div class="ph-bar"><span></span></div>
-          </div>
-        </div>
-        <div class="hv-chip hv-1"><b>9.2</b> hook score</div>
-        <div class="hv-chip hv-2">Follows the speaker</div>
-        <div class="hv-chip hv-3">0:42 → 1:09 · 27s</div>
-      </div>
+    <div class="pills" id="options">
+      <label class="pill-select"><span>Shorts</span>
+        <select id="count"><option>3</option><option>5</option><option selected>8</option><option>12</option><option>20</option></select>
+      </label>
+      <label class="pill-select"><span>Language</span>
+        <select id="lang">
+          <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option>
+          <option value="de">German</option><option value="pt">Portuguese</option><option value="it">Italian</option><option value="ar">Arabic</option>
+        </select>
+      </label>
+      <label class="pill-select"><span>Picking</span>
+        <select id="finder"><option value="smart">Smart</option><option value="deep">Deep</option><option value="instant">Instant</option></select>
+      </label>
+      <label class="pill-select"><span>Accuracy</span>
+        <select id="quality"><option value="fast">Fast</option><option value="better">Better</option><option value="best">Best</option></select>
+      </label>
     </div>
+    <p class="opt-help" id="optHelp"></p>
+    <p class="gpu-note" id="gpuNote" hidden></p>
 
-    <section class="how" id="how" aria-labelledby="howTitle">
-      <h2 class="section-label" id="howTitle">How it works</h2>
-      <ol class="how-grid">
-        <li><span class="how-n">01</span><h3>Transcribe</h3><p>Speech becomes timed text on your graphics card. Fix any misheard word and the captions follow.</p></li>
-        <li><span class="how-n">02</span><h3>Find the moments</h3><p>Strong opening lines that make sense on their own are scored and titled. Pick your own lines too.</p></li>
-        <li><span class="how-n">03</span><h3>Export shorts</h3><p>Vertical 9:16 MP4s that follow the speaker, with word-by-word captions and an optional title card.</p></li>
-      </ol>
-      <ul class="chips">
-        <li>Nothing uploaded</li><li>No account</li><li>No watermark</li><li>Free &amp; open source</li><li>Podcasts become audiograms</li><li>Subtitles (.srt) too</li>
-      </ul>
-    </section>
+    <ul class="facts">
+      <li>Nothing uploaded</li><li>No account</li><li>No watermark</li><li>Free and open source</li>
+    </ul>
   </section>
 
   <!-- ============================== workspace ============================== -->
   <section class="work" id="work" hidden>
-    <aside class="work-side">
-      <div class="player-wrap">
+    <div class="stage-col">
+      <div class="progress-pill" id="progress" hidden>
+        <span class="spin" aria-hidden="true"></span>
+        <span class="pp-text" id="ppText">Starting…</span>
+        <span class="pp-step" id="ppStep"></span>
+        <span class="pp-bar"><i id="ppBar"></i></span>
+      </div>
+
+      <div class="stage" id="stage">
         <video id="player" controls playsinline></video>
-      </div>
-
-      <ol class="steps" aria-label="Progress">
-        <li id="stDecode"><span class="dot"></span><span class="name">Read audio</span><span class="info"></span><progress value="0" max="1"></progress></li>
-        <li id="stAsr"><span class="dot"></span><span class="name">Transcribe</span><span class="info"></span><progress value="0" max="1"></progress></li>
-        <li id="stLlm"><span class="dot"></span><span class="name">Prepare moment finder</span><span class="info"></span><progress value="0" max="1"></progress></li>
-        <li id="stPick"><span class="dot"></span><span class="name">Find the best moments</span><span class="info"></span><progress value="0" max="1"></progress></li>
-      </ol>
-
-      <div class="panel transcript-panel" id="transcriptBox" hidden>
-        <div class="panel-head">
-          <h2 class="section-label">Transcript</h2>
-          <div class="panel-actions">
-            <button class="btn btn-ghost btn-sm" id="fromSel" title="Select lines in the transcript first">Make a short from selection</button>
-            <button class="btn btn-ghost btn-sm" id="srt" disabled title="Download subtitles (.srt)">.srt</button>
-          </div>
-        </div>
-        <p class="hint">Click a time to play from there · click text to fix a word</p>
-        <div id="transcript"></div>
-      </div>
-    </aside>
-
-    <div class="work-main">
-      <div class="results-head">
-        <div>
-          <h2 class="results-title">Shorts</h2>
-          <p class="results-sub" id="resultsSub">Finding the best moments…</p>
-        </div>
-        <div class="results-actions">
-          <button class="btn btn-ghost" id="json" disabled title="Download the clip list (.json)">Clip list</button>
-          <button class="btn btn-primary" id="exAll" disabled>
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Export all
+        <div class="crop" id="crop" hidden>
+          <button class="crop-handle" id="cropHandle" type="button" title="Drag to choose what stays in the frame">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6 2 10l4 4M14 6l4 4-4 4M2 10h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="cropLabel">Drag</span>
           </button>
         </div>
       </div>
 
-      <div class="panel exportbar">
-        <label class="field">
-          <span class="legend">Framing</span>
-          <select id="exLayout">
-            <option value="auto">Follow speaker</option>
-            <option value="crop">Fixed crop</option>
-            <option value="blur">Blurred fill</option>
-          </select>
-        </label>
-        <label class="field field-range">
-          <span class="legend">Crop position <em id="exPosVal">center</em></span>
-          <input type="range" id="exPos" min="0" max="100" value="50">
-        </label>
-        <label class="field">
-          <span class="legend">Captions</span>
-          <select id="exCaps">
-            <option value="pop">Word by word</option>
-            <option value="classic">Subtitles</option>
-            <option value="none">None</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="legend">Title card</span>
-          <select id="exTitle">
-            <option value="intro">First 3 seconds</option>
-            <option value="always">Whole clip</option>
-            <option value="none">None</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="legend">Quality</span>
-          <select id="exSize">
-            <option value="1080">1080 × 1920</option>
-            <option value="720">720 × 1280</option>
-          </select>
-        </label>
+      <div class="selected" id="selected" hidden>
+        <div class="sel-main">
+          <input class="sel-title" id="selTitle" aria-label="Short title (shown on the title card)" spellcheck="false">
+          <span class="sel-time" id="selTime"></span>
+        </div>
+        <div class="sel-actions">
+          <div class="nudge">
+            <span>Start</span><button data-k="start" data-d="-1" title="Start 1 second earlier">−1s</button><button data-k="start" data-d="1" title="Start 1 second later">+1s</button>
+          </div>
+          <div class="nudge">
+            <span>End</span><button data-k="end" data-d="-1" title="End 1 second earlier">−1s</button><button data-k="end" data-d="1" title="End 1 second later">+1s</button>
+          </div>
+          <button class="btn btn-outline" id="selPlay">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10l8-5z" fill="currentColor"/></svg>Preview
+          </button>
+          <button class="btn btn-solid" id="selExport">Export</button>
+        </div>
+        <div class="sel-progress" id="selProgress" hidden><span class="pp-bar"><i></i></span><span class="lbl"></span></div>
       </div>
-      <p class="hint export-hint" id="exNote">Exports render in real time (a 30-second short takes about 30 seconds). Keep this tab open and visible.</p>
 
-      <div id="results">
+      <div class="dock" id="dock">
+        <div class="dock-group" role="radiogroup" aria-label="Framing">
+          <span class="dock-label">Frame</span>
+          <label><input type="radio" name="layout" value="auto" checked><span>Follow speaker</span></label>
+          <label><input type="radio" name="layout" value="crop"><span>Fixed</span></label>
+          <label><input type="radio" name="layout" value="blur"><span>Full + blur</span></label>
+        </div>
+        <div class="dock-group" role="radiogroup" aria-label="Captions">
+          <span class="dock-label">Captions</span>
+          <label><input type="radio" name="caps" value="pop" checked><span>Word by word</span></label>
+          <label><input type="radio" name="caps" value="classic"><span>Subtitles</span></label>
+          <label><input type="radio" name="caps" value="none"><span>Off</span></label>
+        </div>
+        <div class="dock-group" role="radiogroup" aria-label="Title card">
+          <span class="dock-label">Title</span>
+          <label><input type="radio" name="title" value="intro" checked><span>Intro</span></label>
+          <label><input type="radio" name="title" value="always"><span>Always</span></label>
+          <label><input type="radio" name="title" value="none"><span>Off</span></label>
+        </div>
+        <div class="dock-group" role="radiogroup" aria-label="Size">
+          <label><input type="radio" name="size" value="1080" checked><span>1080p</span></label>
+          <label><input type="radio" name="size" value="720"><span>720p</span></label>
+        </div>
+      </div>
+      <p class="export-note" id="exNote">Exports play through in real time, so a 30-second short takes about 30 seconds. Keep this tab open.</p>
+    </div>
+
+    <aside class="side" aria-label="Shorts and transcript">
+      <div class="side-tabs" role="tablist">
+        <button class="side-tab active" role="tab" data-tab="clipsPane" aria-selected="true">Shorts <span class="count" id="clipCount"></span></button>
+        <button class="side-tab" role="tab" data-tab="transcriptPane" aria-selected="false">Transcript</button>
+      </div>
+
+      <div class="pane" id="clipsPane">
         <div class="clips" id="clips"></div>
         <div class="empty" id="clipsEmpty">
           <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+          <p id="resultsSub">Your shorts will show up here.</p>
+        </div>
+        <div class="pane-foot">
+          <button class="btn btn-solid" id="exAll" disabled>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="exAllLabel">Export all</span>
+          </button>
+          <button class="link-btn" id="json" disabled>Download clip list (.json)</button>
         </div>
       </div>
-    </div>
+
+      <div class="pane" id="transcriptPane" hidden>
+        <div class="pane-head">
+          <button class="btn btn-outline btn-sm" id="fromSel">Make a short from selected text</button>
+          <button class="link-btn" id="srt" disabled>Subtitles (.srt)</button>
+        </div>
+        <p class="hint">Click a time to jump there. Click any word to fix it; captions use your fix.</p>
+        <div id="transcript"><p class="hint" id="transcriptEmpty">The transcript appears here as it’s written.</p></div>
+      </div>
+    </aside>
   </section>
 </main>
 
 <footer class="statusbar">
   <span class="sb-left" id="status">Ready · drop a video anywhere</span>
-  <span class="sb-right">© 2026 <a href="https://bankasimedia.com" target="_blank" rel="noopener">BANKASI MEDIA</a> · Free &amp; <a href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener">open source</a> · No ads · Nothing uploaded</span>
+  <span class="sb-right">© 2026 <a href="https://bankasimedia.com" target="_blank" rel="noopener">BANKASI MEDIA</a> · Free &amp; <a href="https://github.com/marwenclock/omniclip" target="_blank" rel="noopener">open source</a> · No ads</span>
 </footer>
 
-<div class="dropveil" id="dropVeil" hidden><div><span class="drop-tag">[drop]</span>Release to start</div></div>
+<div class="dropveil" id="dropVeil" hidden><div>Drop to start</div></div>
 
 <script type="module" src="app.js"></script>
 </body>

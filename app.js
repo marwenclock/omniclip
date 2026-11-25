@@ -3,7 +3,8 @@ import { exportClip, exportExt, exportMime, clipWords } from './export.js';
 import { pickModel, loadLLM, instantClips, rateClip, rank, fmt } from './clips.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { segments: [], clips: [], file: null, url: null, stopAt: null, thumbs: new Map() };
+const state = { segments: [], clips: [], mine: [], sel: null, file: null, url: null, stopAt: null, thumbs: new Map(), pos: 0.5 };
+let nextId = 1;
 
 // ---------- settings (named by what they do; the models behind them stay an implementation detail) ----------
 const QUALITY = {
@@ -16,78 +17,93 @@ const FINDER = {
   deep: { model: 'Phi-3.5-mini-instruct-q4f16_1-MLC', shortlist: 2 },
   instant: null,
 };
+const FINDER_HELP = {
+  smart: 'Smart: an on-device AI rates each moment and writes titles (about 1 GB, downloaded once).',
+  deep: 'Deep: a stronger on-device AI for fast graphics cards (about 2.2 GB, downloaded once).',
+  instant: 'Instant: picks moments from the transcript alone, with nothing extra to download.',
+};
+const QUALITY_HELP = {
+  fast: 'Fast transcription: 200 MB.',
+  better: 'Better transcription: 600 MB.',
+  best: 'Best transcription: 1.6 GB, for fast graphics cards.',
+};
 const radio = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value;
-const finder = () => radio('finder') || 'smart';
-const asrModel = () => QUALITY[radio('quality')] || QUALITY.fast;
+const finder = () => $('finder').value || 'smart';
+const asrModel = () => QUALITY[$('quality').value] || QUALITY.fast;
 
-// Remember the visitor's options on this device.
+// Remember the visitor's choices on this device.
 const OPT_KEY = 'omniclip:options';
+const STYLE_KEY = 'omniclip:style';
 function saveOptions() {
-  localStorage.setItem(OPT_KEY, JSON.stringify({ finder: finder(), quality: radio('quality'), lang: $('lang').value, count: $('count').value }));
-  summarizeOptions();
+  localStorage.setItem(OPT_KEY, JSON.stringify({ finder: finder(), quality: $('quality').value, lang: $('lang').value, count: $('count').value }));
+  explainOptions();
 }
 function loadOptions() {
   try {
     const o = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
-    for (const k of ['finder', 'quality']) if (o[k]) { const r = document.querySelector(`input[name="${k}"][value="${o[k]}"]`); if (r) r.checked = true; }
-    if (o.lang) $('lang').value = o.lang;
-    if (o.count) $('count').value = o.count;
+    for (const k of ['finder', 'quality', 'lang', 'count']) if (o[k] && [...$(k).options].some((x) => x.value === String(o[k]))) $(k).value = o[k];
+    const s = JSON.parse(localStorage.getItem(STYLE_KEY) || '{}');
+    for (const k of ['layout', 'caps', 'title', 'size']) if (s[k]) { const r = document.querySelector(`input[name="${k}"][value="${s[k]}"]`); if (r) r.checked = true; }
+    if (typeof s.pos === 'number') state.pos = s.pos;
   } catch { /* first visit */ }
-  summarizeOptions();
+  explainOptions();
 }
-function summarizeOptions() {
-  const cap = (s) => s[0].toUpperCase() + s.slice(1);
-  $('optSummary').textContent = `${cap(finder())} · ${cap(radio('quality'))} · ${$('lang').selectedOptions[0].text} · ${$('count').value} shorts`;
+const saveStyle = () => localStorage.setItem(STYLE_KEY, JSON.stringify({ layout: radio('layout'), caps: radio('caps'), title: radio('title'), size: radio('size'), pos: state.pos }));
+function explainOptions() {
+  $('optHelp').textContent = `${FINDER_HELP[finder()]} ${QUALITY_HELP[$('quality').value]}`;
 }
-document.querySelectorAll('#options input, #options select').forEach((el) => el.addEventListener('change', saveOptions));
+document.querySelectorAll('#options select').forEach((el) => el.addEventListener('change', saveOptions));
 loadOptions();
 
 // ---------- capability check (not awaited at top level: the file picker works immediately) ----------
 let hasGPU = false;
 const gpuReady = (async () => {
   hasGPU = !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
-  const note = $('gpuNote');
-  if (hasGPU) {
-    note.textContent = 'Your browser can use the graphics card. The AI is downloaded once, then loads from cache.';
-    note.classList.add('ok');
-  } else {
-    note.textContent = 'This browser can’t use the graphics card, so transcription will be slow and moments are picked without AI. For the full experience use a recent Chrome or Edge on a computer.';
-    note.classList.add('bad');
+  if (!hasGPU) {
+    $('gpuNote').textContent = 'This browser can’t use your graphics card, so transcription will be slow and moments are picked without AI. For the full experience, use a recent Chrome or Edge on a computer.';
+    $('gpuNote').hidden = false;
   }
 })();
 
-// ---------- small UI helpers ----------
-function step(id, { active, done, value, info } = {}) {
-  const li = $(id);
-  if (active) li.classList.add('active');
-  if (done) { li.classList.add('done'); li.classList.remove('active'); li.querySelector('progress').value = 1; }
-  if (value !== undefined) li.querySelector('progress').value = value;
-  if (info !== undefined) li.querySelector('.info').textContent = info;
-  if (active || value !== undefined) setStatus(`${li.querySelector('.name').textContent}${info ? ' · ' + info : ''}`);
-}
+// ---------- helpers ----------
 const setStatus = (t) => { $('status').textContent = t; };
 const mb = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : (b / 1e6).toFixed(0) + ' MB');
-const shorts = (n) => `${n} short${n === 1 ? "" : "s"}`;
+const shorts = (n) => `${n} short${n === 1 ? '' : 's'}`;
 const eta = (sec) => (sec < 60 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`);
-const playIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/><path d="M9.6 7.8v8.4l6.6-4.2z" fill="#fff"/></svg>';
+const ICON = {
+  down: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
 
-// ---------- hero sample short: captions light up word by word ----------
-(() => {
-  const el = $('demoCaption');
-  const lines = [['NOBODY', 'TELLS', 'YOU'], ['THE', 'CHEAPEST', 'CLIENT'], ['WANTS', 'THE', 'MOST.'], ['SO', 'I', 'DOUBLED'], ['MY', 'PRICE.']];
-  let li = 0, wi = 0;
-  const render = () => { el.innerHTML = lines[li].map((w, i) => `<span class="${i === wi ? 'on' : ''}">${w}</span>`).join(' '); };
-  render();
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  setInterval(() => {
-    if (state.file) return;
-    wi++;
-    if (wi >= lines[li].length) { wi = 0; li = (li + 1) % lines.length; }
-    render();
-  }, 380);
-})();
+// ---------- progress: one floating pill that shows the step that matters now ----------
+const STEPS = {
+  stDecode: { label: 'Reading the audio', order: 1 },
+  stAsr: { label: 'Transcribing', order: 2 },
+  stLlm: { label: 'Loading the AI', order: 0 },
+  stPick: { label: 'Rating the moments', order: 3 },
+};
+const progress = {};
+function step(id, { active, done, value, info } = {}) {
+  const p = (progress[id] ||= { active: false, done: false, value: 0, info: '' });
+  if (active) p.active = true;
+  if (done) { p.done = true; p.active = false; p.value = 1; }
+  if (value !== undefined) p.value = value;
+  if (info !== undefined) p.info = info;
+  renderProgress();
+}
+function renderProgress() {
+  const live = Object.entries(progress).filter(([, p]) => p.active).sort((a, b) => STEPS[b[0]].order - STEPS[a[0]].order);
+  $('progress').hidden = !live.length;
+  if (!live.length) return;
+  const [id, p] = live[0];
+  $('ppText').textContent = STEPS[id].label;
+  const extra = live.find(([k]) => k === 'stLlm' && k !== id);
+  $('ppStep').textContent = p.info + (extra ? ` · AI ${Math.round(extra[1].value * 100)}%` : '');
+  $('ppBar').style.width = `${Math.round(p.value * 100)}%`;
+  setStatus(`${STEPS[id].label}${p.info ? ' · ' + p.info : ''}`);
+}
 
-// ---------- file input: the drop card, the button, or anywhere on the page ----------
+// ---------- file input: the drop card or anywhere on the page ----------
 $('file').addEventListener('change', (e) => e.target.files[0] && start(e.target.files[0]));
 const veil = $('dropVeil');
 let dragDepth = 0;
@@ -104,6 +120,17 @@ $('newVideo').onclick = () => {
   location.href = './';
 };
 
+// ---------- side tabs ----------
+function showTab(id) {
+  document.querySelectorAll('.side-tab').forEach((t) => {
+    const on = t.dataset.tab === id;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on);
+    $(t.dataset.tab).hidden = !on;
+  });
+}
+document.querySelectorAll('.side-tab').forEach((t) => (t.onclick = () => showTab(t.dataset.tab)));
+
 // ---------- pipeline ----------
 async function start(file) {
   state.file = file;
@@ -115,11 +142,14 @@ async function start(file) {
   $('fileName').textContent = file.name;
   $('fileMeta').textContent = mb(file.size);
   document.title = `${file.name} · OMNICLIP`;
-  scrollTo(0, 0);
   state.url = URL.createObjectURL(file);
   $('player').src = state.url;
   $('player').addEventListener('loadedmetadata', () => {
     $('fileMeta').textContent = `${fmt($('player').duration)} · ${mb(file.size)}`;
+    const audioOnly = !$('player').videoWidth;
+    $('stage').classList.toggle('audio', audioOnly);
+    document.querySelector('.dock-group[aria-label="Framing"]').hidden = audioOnly;
+    layoutCrop();
   }, { once: true });
   if (!exportMime) $('exNote').textContent = 'This browser can’t record video, so exporting is unavailable here. Use Chrome or Edge on a computer.';
   const t0 = performance.now();
@@ -128,13 +158,11 @@ async function start(file) {
     const mode = hasGPU ? finder() : 'instant';
     // Load the moment finder while transcription runs, so its download overlaps.
     const llmReady = mode === 'instant' ? null : loadPicker(FINDER[mode].model);
-    llmReady?.catch(() => {}); // surfaced by pickSmart
+    llmReady?.catch(() => {}); // surfaced below
     const cached = await dbGet(transcriptKey()).catch(() => null);
     if (cached?.segments?.length) {
       state.segments = cached.segments;
       addTranscript(state.segments);
-      step('stDecode', { done: true, info: 'skipped' });
-      step('stAsr', { done: true, info: `remembered · ${state.segments.length} lines` });
       $('srt').disabled = false;
     } else {
       const audio = await decode(file);
@@ -144,12 +172,15 @@ async function start(file) {
     if (!state.segments.length) throw new Error('No speech was found in this file.');
     if (mode === 'instant') pickInstant();
     else { await llmReady; await pickSmart(+$('count').value, FINDER[mode].shortlist); }
-    setStatus(`Done in ${eta((performance.now() - t0) / 1000)} · ${shorts(state.clips.length)} ready to export`);
+    setStatus(`Done in ${eta((performance.now() - t0) / 1000)} · ${shorts(allClips().length)} ready to export${state.aiFailed ? ' · the on-device AI stopped responding, so moments were picked from the transcript' : ''}`);
   } catch (err) {
     console.error(err);
-    setStatus('Something went wrong: ' + (err.message || err));
-    $('resultsSub').textContent = 'Something went wrong: ' + (err.message || err);
-    $('clipsEmpty').hidden = true;
+    for (const p of Object.values(progress)) p.active = false;
+    renderProgress();
+    const msg = 'Something went wrong: ' + (err.message || err);
+    setStatus(msg);
+    $('resultsSub').textContent = msg;
+    $('clipsEmpty').classList.add('failed');
   }
 }
 
@@ -158,7 +189,7 @@ async function decode(file) {
   const mp4ish = /mp4|quicktime|m4a|m4v/.test(file.type) || /\.(mp4|mov|m4a|m4v)$/i.test(file.name);
   const streamed = async () => {
     const audio = await decodeAudioStream(file, (p) => step('stDecode', { value: p, info: `${mb(file.size * p)} / ${mb(file.size)}` }));
-    step('stDecode', { done: true, info: `${fmt(audio.length / 16000)} of audio` });
+    step('stDecode', { done: true });
     return audio;
   };
   // Big MP4/MOV files: stream the audio out instead of loading the whole file.
@@ -180,13 +211,13 @@ async function decodeWhole(file) {
     const r = buf.getChannelData(1);
     mono = mono.map((v, i) => (v + r[i]) / 2);
   }
-  step('stDecode', { done: true, info: `${fmt(buf.duration)} of audio` });
+  step('stDecode', { done: true });
   return mono;
 }
 
 function transcribe(audio) {
   return new Promise((resolve, reject) => {
-    step('stAsr', { active: true, info: 'starting…' });
+    step('stAsr', { active: true, value: 0, info: 'starting…' });
     const worker = new Worker('./asr-worker.js', { type: 'module' });
     const dl = {};
     worker.onmessage = ({ data: m }) => {
@@ -201,7 +232,7 @@ function transcribe(audio) {
         const left = (m.elapsed / m.done) * (m.total - m.done);
         step('stAsr', { value: m.done / m.total, info: `${fmt(m.done)} / ${fmt(m.total)} · ${eta(left)} left` });
       } else if (m.type === 'finished') {
-        step('stAsr', { done: true, info: `${state.segments.length} lines` });
+        step('stAsr', { done: true });
         $('srt').disabled = false;
         worker.terminate();
         resolve();
@@ -221,100 +252,240 @@ async function loadPicker(preferred) {
     const m = text.match(/(\d+)MB/);
     step('stLlm', { value: p, info: m ? `loading ${m[1]} MB` : Math.round(p * 100) + '%' });
   });
-  step('stLlm', { done: true, info: 'ready' });
+  step('stLlm', { done: true });
 }
+
+const allClips = () => [...state.mine, ...state.clips];
+const tag = (list) => { for (const c of list) c.id ||= nextId++; return list; };
 
 // Smart: transcript signals set the cuts and show at once; the on-device AI then
 // rates and titles each one, and the list re-sorts as its verdicts come in.
 async function pickSmart(n, factor) {
-  const shortlist = instantClips(state.segments, Math.ceil(n * factor));
+  const shortlist = tag(instantClips(state.segments, Math.ceil(n * factor)));
   state.clips = shortlist.slice(0, n);
-  showClips('Rating the best moments…');
-  step('stPick', { active: true, info: `0/${shortlist.length}` });
-  const rated = [];
+  showClips();
+  step('stPick', { active: true, value: 0, info: `0 / ${shortlist.length}` });
   const t0 = performance.now();
+  let failures = 0;
   for (let i = 0; i < shortlist.length; i++) {
-    try { rated.push(await rateClip(shortlist[i])); } catch (e) { console.warn(e); rated.push(shortlist[i]); }
+    const c = shortlist[i];
+    try {
+      const r = await rateClip({ ...c });
+      c.score = r.score;
+      if (!c._titleEdited) c.title = r.title;
+    } catch (e) {
+      console.warn(e);
+      // The graphics card gave up (common on weak GPUs): keep the transcript picks instead of failing every clip.
+      if (++failures >= 2) { state.aiFailed = true; break; }
+    }
     const el = (performance.now() - t0) / 1000;
-    step('stPick', { value: (i + 1) / shortlist.length, info: `${i + 1}/${shortlist.length} · ${eta((el / (i + 1)) * (shortlist.length - i - 1))} left` });
-    state.clips = rank([...rated, ...shortlist.slice(i + 1)], n);
-    showClips('Rating the best moments…');
+    step('stPick', { value: (i + 1) / shortlist.length, info: `${i + 1} / ${shortlist.length} · ${eta((el / (i + 1)) * (shortlist.length - i - 1))} left` });
+    state.clips = rank(shortlist, n);
+    showClips();
   }
-  step('stPick', { done: true, info: shorts(state.clips.length) });
-  finishResults('Best first · rated by the on-device AI');
+  step('stPick', { done: true });
+  finishResults();
 }
 
 function pickInstant() {
-  step('stLlm', { done: true, info: 'not needed' });
-  state.clips = instantClips(state.segments, +$('count').value);
-  step('stPick', { done: true, info: shorts(state.clips.length) });
-  finishResults('Best first · picked from the transcript');
+  state.clips = tag(instantClips(state.segments, +$('count').value));
+  finishResults();
 }
 
-function finishResults(sub) {
-  showClips(state.clips.length ? sub : 'No clear moments found. Select lines in the transcript to make your own.');
-  $('json').disabled = !state.clips.length;
-  $('exAll').disabled = !state.clips.length || !exportMime;
+function finishResults() {
+  showClips();
+  if (!allClips().length) {
+    $('resultsSub').textContent = 'No clear moments found. Open the transcript, select some lines and make your own short.';
+    $('clipsEmpty').classList.add('failed');
+  }
 }
 
-// ---------- clip cards ----------
-function showClips(sub) {
-  if (sub) $('resultsSub').textContent = `${shorts(state.clips.length)} · ${sub}`;
-  $('clipsEmpty').hidden = state.clips.length > 0;
+// ---------- clip list ----------
+function showClips() {
+  const list = allClips();
+  $('clipCount').textContent = list.length || '';
+  $('clipsEmpty').hidden = list.length > 0;
+  $('json').disabled = !list.length;
+  $('exAll').disabled = !list.length || !exportMime;
+  $('exAllLabel').textContent = list.length > 1 ? `Export all ${list.length} shorts` : 'Export all';
   $('clips').innerHTML = '';
-  state.clips.forEach((c, i) => {
+  list.forEach((c, i) => {
     const el = document.createElement('article');
     el.className = 'clip';
-    el.style.animationDelay = `${Math.min(i, 8) * 30}ms`;
+    el.tabIndex = 0;
     el.innerHTML = `
-      <button class="thumb" type="button" aria-label="Play this moment"><span class="play">${playIcon}</span><span class="dur"></span></button>
-      <div class="clip-body">
-        <div class="clip-top"><h3></h3><span class="score"></span></div>
-        <div class="meta"></div>
-        <p class="hook"></p>
-        <p class="text"></p>
-        <div class="clip-foot">
-          <div class="nudge" title="Move the start"><span>In</span><button data-k="start" data-d="-1" aria-label="Start 1 second earlier">−1s</button><button data-k="start" data-d="1" aria-label="Start 1 second later">+1s</button></div>
-          <div class="nudge" title="Move the end"><span>Out</span><button data-k="end" data-d="-1" aria-label="End 1 second earlier">−1s</button><button data-k="end" data-d="1" aria-label="End 1 second later">+1s</button></div>
-          <button class="btn btn-sm export" type="button"></button>
-          <div class="export-state" hidden><progress value="0" max="1"></progress><span class="lbl"></span></div>
-          <a class="dl" hidden>Download again</a>
-        </div>
-      </div>`;
-    el.querySelector('h3').textContent = c.title;
-    const score = el.querySelector('.score');
-    score.textContent = c.score;
-    score.title = typeof c.score === 'number' ? 'Score out of 10' : 'Your own pick';
-    score.classList.toggle('mine', typeof c.score !== 'number');
-    el.querySelector('.hook').textContent = c.hook || '';
-    el.querySelector('.hook').hidden = !c.hook;
-    const meta = () => {
-      el.querySelector('.meta').textContent = `#${i + 1} · ${fmt(c.start)} → ${fmt(c.end)}`;
-      el.querySelector('.dur').textContent = `${Math.round(c.end - c.start)}s`;
-    };
-    meta();
-    el.querySelector('.text').textContent = '“' + c.text + '”';
-    el.querySelector('.thumb').onclick = () => playClip(c, el);
-    el.querySelector('.export').onclick = () => queueExport(c);
-    el.querySelectorAll('.nudge button').forEach((b) => {
-      b.onclick = () => {
-        const d = +b.dataset.d;
-        if (b.dataset.k === 'start') c.start = Math.max(0, Math.min(c.end - 5, c.start + d));
-        else c.end = Math.max(c.start + 5, Math.min($('player').duration || Infinity, c.end + d));
-        c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' ');
-        el.querySelector('.text').textContent = '“' + c.text + '”';
-        meta();
-        c._blobUrl = null;
-        renderExportState(c);
-        if (b.dataset.k === 'start') setThumb(c, el);
-      };
-    });
+      <div class="thumb"><span class="dur"></span></div>
+      <div class="clip-body"><h3></h3><div class="meta"></div></div>
+      <div class="clip-state"></div>`;
+    el.onclick = (e) => { if (!e.target.closest('.clip-state')) select(c); };
+    el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(c, true); } };
     c._el = el;
+    renderClipText(c, i);
     renderExportState(c);
     setThumb(c, el);
     $('clips').append(el);
   });
+  if (!state.sel || !list.includes(state.sel)) {
+    const keep = state.sel && list.find((c) => c.id === state.sel.id);
+    if (keep || list[0]) select(keep || list[0], false, true);
+    else $('selected').hidden = true;
+  } else {
+    state.sel._el.classList.add('selected');
+    renderSelected();
+  }
 }
+
+function renderClipText(c, i = allClips().indexOf(c)) {
+  const el = c._el;
+  if (!el) return;
+  el.querySelector('h3').textContent = c.title;
+  const score = typeof c.score === 'number' ? `<b>${c.score}/10</b> · ` : '<b>Your pick</b> · ';
+  el.querySelector('.meta').innerHTML = `${score}${fmt(c.start)} · ${Math.round(c.end - c.start)}s`;
+  el.querySelector('.dur').textContent = `${Math.round(c.end - c.start)}s`;
+  el.setAttribute('aria-label', `Short ${i + 1}: ${c.title}`);
+}
+
+// ---------- the selected short ----------
+function select(c, play = false, quiet = false) {
+  state.sel = c;
+  document.querySelectorAll('.clip.selected').forEach((x) => x.classList.remove('selected'));
+  c._el?.classList.add('selected');
+  $('selected').hidden = false;
+  renderSelected();
+  const v = $('player');
+  if (!quiet || v.paused) {
+    if (play) playClip(c);
+    else if (!quiet || v.currentTime === 0) { state.stopAt = null; v.pause(); v.currentTime = c.start + 0.05; }
+  }
+  highlightTranscript(c, !quiet);
+}
+
+function renderSelected() {
+  const c = state.sel;
+  if (!c) return;
+  if (document.activeElement !== $('selTitle')) $('selTitle').value = c.title;
+  $('selTime').textContent = `${fmt(c.start)} – ${fmt(c.end)} · ${Math.round(c.end - c.start)}s${typeof c.score === 'number' ? ` · scored ${c.score}/10` : ''}`;
+  const busy = c._progress != null, queued = exportQueue.includes(c) && !busy;
+  const btn = $('selExport');
+  btn.disabled = busy || queued || !exportMime;
+  btn.innerHTML = busy ? 'Exporting…' : queued ? 'Queued' : c._blobUrl ? `${ICON.check} Saved · export again` : `${ICON.down} Export`;
+  $('selProgress').hidden = !busy;
+  if (busy) {
+    $('selProgress').querySelector('i').style.width = `${Math.round(c._progress * 100)}%`;
+    $('selProgress').querySelector('.lbl').textContent = `${c._label || 'Exporting'} ${Math.round(c._progress * 100)}%`;
+  }
+}
+
+$('selTitle').oninput = () => {
+  const c = state.sel;
+  if (!c) return;
+  c.title = $('selTitle').value;
+  c._titleEdited = true;
+  c._blobUrl = null;
+  renderClipText(c);
+  renderExportState(c);
+};
+$('selTitle').onkeydown = (e) => { if (e.key === 'Enter') $('selTitle').blur(); };
+$('selPlay').onclick = () => state.sel && playClip(state.sel);
+$('selExport').onclick = () => state.sel && queueExport(state.sel);
+document.querySelectorAll('.selected .nudge button').forEach((b) => {
+  b.onclick = () => {
+    const c = state.sel;
+    if (!c) return;
+    const d = +b.dataset.d;
+    if (b.dataset.k === 'start') c.start = Math.max(0, Math.min(c.end - 5, c.start + d));
+    else c.end = Math.max(c.start + 5, Math.min($('player').duration || Infinity, c.end + d));
+    c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' ');
+    c._blobUrl = null;
+    renderClipText(c);
+    renderExportState(c);
+    renderSelected();
+    highlightTranscript(c, false);
+    if (b.dataset.k === 'start') { setThumb(c, c._el); state.stopAt = null; $('player').pause(); $('player').currentTime = c.start + 0.05; }
+    else { $('player').pause(); $('player').currentTime = Math.max(c.start, c.end - 2); }
+  };
+});
+
+function playClip(c) {
+  const v = $('player');
+  state.stopAt = c.end;
+  v.currentTime = c.start;
+  v.play();
+  if (innerWidth <= 900) $('stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('player').addEventListener('timeupdate', () => {
+  const v = $('player');
+  if (state.stopAt !== null && v.currentTime >= state.stopAt) { v.pause(); state.stopAt = null; }
+});
+$('player').addEventListener('play', () => $('stage').classList.add('playing'));
+$('player').addEventListener('pause', () => $('stage').classList.remove('playing'));
+
+function highlightTranscript(c, scroll) {
+  let first = null;
+  document.querySelectorAll('#transcript p[data-t]').forEach((p) => {
+    const on = +p.dataset.t >= c.start - 0.01 && +p.dataset.t < c.end;
+    p.classList.toggle('inclip', on);
+    if (on && !first) first = p;
+  });
+  if (scroll && !$('transcriptPane').hidden) first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---------- 9:16 crop preview on the player (drag to choose the framing) ----------
+function layoutCrop() {
+  const v = $('player'), box = $('crop'), layout = radio('layout');
+  if (!v.videoWidth || layout === 'blur' || v.videoWidth / v.videoHeight <= 9 / 16 + 0.01) { box.hidden = true; return; }
+  const W = v.clientWidth, H = v.clientHeight, s = Math.min(W / v.videoWidth, H / v.videoHeight);
+  const cw = v.videoWidth * s, ch = v.videoHeight * s, cx = (W - cw) / 2, cy = (H - ch) / 2;
+  const bw = (ch * 9) / 16;
+  Object.assign(box.style, { left: `${cx + (cw - bw) * state.pos}px`, top: `${cy}px`, width: `${bw}px`, height: `${ch}px` });
+  box.hidden = false;
+  box.classList.toggle('auto', layout === 'auto');
+  $('cropLabel').textContent = layout === 'auto' ? 'Follows the speaker' : 'Drag to frame';
+  box._range = cw - bw;
+}
+new ResizeObserver(layoutCrop).observe($('stage'));
+(() => {
+  const h = $('cropHandle');
+  let x0 = 0, p0 = 0, dragging = false;
+  h.addEventListener('pointerdown', (e) => {
+    if (radio('layout') !== 'crop') return;
+    dragging = true; x0 = e.clientX; p0 = state.pos; h.setPointerCapture(e.pointerId);
+  });
+  h.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const range = $('crop')._range || 1;
+    state.pos = Math.max(0, Math.min(1, p0 + (e.clientX - x0) / range));
+    layoutCrop();
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    saveStyle();
+    refreshThumbs();
+  };
+  h.addEventListener('pointerup', end);
+  h.addEventListener('pointercancel', end);
+  h.addEventListener('keydown', (e) => {
+    if (radio('layout') !== 'crop' || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    state.pos = Math.max(0, Math.min(1, state.pos + (e.key === 'ArrowLeft' ? -0.05 : 0.05)));
+    layoutCrop(); saveStyle(); refreshThumbs();
+  });
+})();
+function refreshThumbs() {
+  state.thumbs.clear();
+  allClips().forEach((c) => c._el && setThumb(c, c._el));
+  allClips().forEach((c) => { c._blobUrl = null; renderExportState(c); });
+  renderSelected();
+}
+
+// Export style changes: the crop preview follows, and earlier exports no longer match.
+document.querySelectorAll('.dock input').forEach((r) => r.addEventListener('change', () => {
+  saveStyle();
+  layoutCrop();
+  allClips().forEach((c) => { c._blobUrl = null; renderExportState(c); });
+  renderSelected();
+}));
 
 // 9:16 preview frame for each clip, grabbed from the source (sequentially, cached).
 let thumbVideo = null;
@@ -323,17 +494,18 @@ function setThumb(c, el) {
   const key = c.start.toFixed(2);
   const thumb = el.querySelector('.thumb');
   const put = (src) => {
-    thumb.querySelector('img, .wave')?.remove();
+    const target = c._el?.querySelector('.thumb') || thumb;
+    target.querySelector('img, .wave')?.remove();
     if (src === 'audio') {
       const w = document.createElement('span');
       w.className = 'wave';
       let seed = Math.floor(c.start * 97) || 7;
-      for (let k = 0; k < 9; k++) { seed = (seed * 9301 + 49297) % 233280; const i = document.createElement('i'); i.style.height = `${14 + (seed / 233280) * 46}%`; w.append(i); }
-      thumb.prepend(w);
+      for (let k = 0; k < 7; k++) { seed = (seed * 9301 + 49297) % 233280; const i = document.createElement('i'); i.style.height = `${14 + (seed / 233280) * 40}%`; w.append(i); }
+      target.prepend(w);
     } else {
       const img = document.createElement('img');
       img.alt = ''; img.src = src;
-      thumb.prepend(img);
+      target.prepend(img);
     }
   };
   if (state.thumbs.has(key)) { put(state.thumbs.get(key)); return; }
@@ -353,11 +525,10 @@ function setThumb(c, el) {
       cv.width = 180; cv.height = 320;
       const scale = Math.max(180 / v.videoWidth, 320 / v.videoHeight);
       const sw = 180 / scale, sh = 320 / scale;
-      cv.getContext('2d').drawImage(v, (v.videoWidth - sw) * (+$('exPos').value / 100), (v.videoHeight - sh) / 2, sw, sh, 0, 0, 180, 320);
+      cv.getContext('2d').drawImage(v, (v.videoWidth - sw) * state.pos, (v.videoHeight - sh) / 2, sw, sh, 0, 0, 180, 320);
       const url = cv.toDataURL('image/jpeg', 0.78);
       state.thumbs.set(key, url);
-      if (el.isConnected) put(url);
-      else state.clips.find((x) => x.start.toFixed(2) === key && x._el?.isConnected) && put(url);
+      put(url);
     } catch (e) { console.warn('[omniclip] thumbnail failed', e); }
   });
 }
@@ -367,29 +538,38 @@ const exportQueue = [];
 let exporting = false;
 
 function exportOpts() {
-  const w = +$('exSize').value;
+  const w = +radio('size');
   return {
     width: w, height: Math.round((w * 16) / 9),
-    layout: $('exLayout').value,
-    pos: +$('exPos').value / 100,
-    captions: $('exCaps').value,
-    title: $('exTitle').value,
+    layout: radio('layout'),
+    pos: state.pos,
+    captions: radio('caps'),
+    title: radio('title'),
   };
 }
 
 function renderExportState(c) {
   const el = c._el;
-  if (!el) return;
-  const btn = el.querySelector('.export'), box = el.querySelector('.export-state'), dl = el.querySelector('.dl');
-  const busy = c._progress != null, queued = exportQueue.includes(c) && !busy;
-  box.hidden = !busy && !queued;
-  box.querySelector('progress').value = busy ? c._progress : 0;
-  box.querySelector('.lbl').textContent = busy ? `${c._label || 'Exporting…'} ${Math.round(c._progress * 100)}%` : queued ? 'Waiting in line…' : '';
-  btn.disabled = busy || queued || !exportMime;
-  btn.textContent = busy ? 'Exporting…' : queued ? 'Queued' : c._blobUrl ? 'Export again' : 'Export';
-  btn.classList.toggle('btn-primary', !c._blobUrl && !busy && !queued);
-  dl.hidden = !c._blobUrl;
-  if (c._blobUrl) { dl.href = c._blobUrl; dl.download = c._fileName; }
+  if (el) {
+    const box = el.querySelector('.clip-state');
+    const busy = c._progress != null, queued = exportQueue.includes(c) && !busy;
+    if (busy) {
+      const r = 13, len = 2 * Math.PI * r;
+      box.innerHTML = `<svg class="ring" viewBox="0 0 32 32" role="img" aria-label="Exporting ${Math.round(c._progress * 100)}%"><circle class="bg" cx="16" cy="16" r="${r}"/><circle class="fg" cx="16" cy="16" r="${r}" stroke-dasharray="${len}" stroke-dashoffset="${len * (1 - c._progress)}"/></svg>`;
+    } else if (queued) {
+      box.innerHTML = '<span class="queued">Queued</span>';
+    } else if (c._blobUrl) {
+      box.innerHTML = `<a class="icon-btn done" title="Saved · download again">${ICON.check}</a>`;
+      const a = box.querySelector('a');
+      a.href = c._blobUrl; a.download = c._fileName;
+    } else {
+      box.innerHTML = `<button class="icon-btn" type="button" title="Export this short">${ICON.down}</button>`;
+      const b = box.querySelector('button');
+      b.disabled = !exportMime;
+      b.onclick = () => queueExport(c);
+    }
+  }
+  if (c === state.sel) renderSelected();
 }
 
 function queueExport(c) {
@@ -415,7 +595,7 @@ async function runQueue() {
           setStatus(`Exporting “${c.title}” · ${Math.round(p * 100)}%${exportQueue.length > 1 ? ` · ${exportQueue.length - 1} more in line` : ''}`);
         },
       });
-      const n = state.clips.indexOf(c) + 1 || 1;
+      const n = allClips().indexOf(c) + 1 || 1;
       c._fileName = `${base()}-short-${n}-${c.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 40)}.${exportExt}`;
       c._blobUrl = URL.createObjectURL(blob);
       console.log(`[omniclip] exported ${c._fileName} ${(blob.size / 1e6).toFixed(1)} MB in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
@@ -434,40 +614,11 @@ async function runQueue() {
   exporting = false;
 }
 
-$('exAll').onclick = () => state.clips.forEach(queueExport);
-$('exPos').oninput = () => {
-  const v = +$('exPos').value;
-  $('exPosVal').textContent = v < 40 ? 'left' : v > 60 ? 'right' : 'center';
-};
-$('exPos').onchange = () => { state.thumbs.clear(); state.clips.forEach((c) => c._el && setThumb(c, c._el)); };
-const syncLayout = () => { $('exPos').disabled = $('exLayout').value === 'blur'; };
-$('exLayout').onchange = syncLayout;
-syncLayout();
-
-function playClip(c, el) {
-  document.querySelectorAll('.clip.playing').forEach((x) => x.classList.remove('playing'));
-  el.classList.add('playing');
-  const v = $('player');
-  state.stopAt = c.end;
-  v.currentTime = c.start;
-  v.play();
-  if (innerWidth <= 980) v.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  let first = null;
-  document.querySelectorAll('#transcript p').forEach((p) => {
-    const on = +p.dataset.t >= c.start - 0.01 && +p.dataset.t < c.end;
-    p.classList.toggle('inclip', on);
-    if (on && !first) first = p;
-  });
-  first?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-$('player').addEventListener('timeupdate', () => {
-  const v = $('player');
-  if (state.stopAt !== null && v.currentTime >= state.stopAt) { v.pause(); state.stopAt = null; }
-});
+$('exAll').onclick = () => allClips().forEach((c) => { if (!c._blobUrl) queueExport(c); });
 
 // ---------- transcript: times jump the player; text is editable (captions use the fix) ----------
 function addTranscript(segs) {
-  $('transcriptBox').hidden = false;
+  $('transcriptEmpty')?.remove();
   for (const s of segs) {
     const i = state.segments.indexOf(s);
     const p = document.createElement('p');
@@ -491,8 +642,9 @@ function addTranscript(segs) {
     text.onblur = () => {
       if (!s._edited) return;
       s._edited = false;
-      state.clips.forEach((c) => { if (c.end > s.start && c.start < s.end) c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' '); });
-      showClips();
+      allClips().forEach((c) => {
+        if (c.end > s.start && c.start < s.end) { c.text = clipWords(state.segments, c.start, c.end).map((w) => w.w).join(' '); c._blobUrl = null; renderExportState(c); }
+      });
     };
     text.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); text.blur(); } };
     p.append(time, text);
@@ -503,24 +655,24 @@ function addTranscript(segs) {
 $('fromSel').onclick = () => {
   const sel = window.getSelection();
   const ps = [sel.anchorNode, sel.focusNode]
-    .map((n) => (n?.nodeType === 1 ? n : n?.parentElement)?.closest('#transcript p'))
+    .map((n) => (n?.nodeType === 1 ? n : n?.parentElement)?.closest('#transcript p[data-i]'))
     .filter(Boolean);
-  if (!ps.length || sel.isCollapsed) { setStatus('Select one or more lines in the transcript first (click and drag over the text).'); return; }
+  if (!ps.length || sel.isCollapsed) { setStatus('Select some lines in the transcript first: click and drag over the text.'); alert('Select some lines in the transcript first: click and drag over the text, then press this button.'); return; }
   const idx = ps.map((p) => +p.dataset.i).sort((a, b) => a - b);
   const a = state.segments[idx[0]], b = state.segments[idx[idx.length - 1]];
   const clip = {
+    id: nextId++,
     start: a.start, end: b.end,
     title: a.text.replace(/[.!?,]$/, '').split(/\s+/).slice(0, 8).join(' '),
     hook: 'Your own pick', score: '★',
     text: clipWords(state.segments, a.start, b.end).map((w) => w.w).join(' '),
   };
-  state.clips.unshift(clip);
-  showClips(null);
-  $('resultsSub').textContent = shorts(state.clips.length);
-  $('json').disabled = false;
-  $('exAll').disabled = !exportMime;
-  $('clips').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  state.mine.unshift(clip);
+  $('clipsEmpty').classList.remove('failed');
+  showClips();
   sel.removeAllRanges();
+  showTab('clipsPane');
+  select(clip);
   setStatus('Added your own short');
 };
 
@@ -564,4 +716,4 @@ const srtTime = (t) => {
 $('srt').onclick = () => save(base() + '.srt',
   state.segments.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`).join('\n'),
   'text/plain');
-$('json').onclick = () => save(base() + '.shorts.json', JSON.stringify(state.clips.map(({ _el, _blobUrl, _progress, _label, _fileName, ...c }) => c), null, 2), 'application/json');
+$('json').onclick = () => save(base() + '.shorts.json', JSON.stringify(allClips().map(({ _el, _blobUrl, _progress, _label, _fileName, _titleEdited, id, ...c }) => c), null, 2), 'application/json');
